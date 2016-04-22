@@ -111,6 +111,9 @@ public class Diff extends AbstractCommand implements CLICommand {
 
         String oldVersion = resolveOldVersion();
         String newVersion = resolveNewVersion();
+        if (filepath != null) {
+            System.out.println(filepath);
+        }
 
         List<String> paths = removeEmptyPaths();
         if (bounds) {
@@ -166,9 +169,7 @@ public class Diff extends AbstractCommand implements CLICommand {
             cli.getConsole().println("No differences found");
             return;
         }
-        if (filepath != null) {
-            System.out.println(filepath);
-        }
+
         DiffPrinter printer;
         if (summary) {
             printer = new SummaryDiffPrinter();
@@ -177,10 +178,24 @@ public class Diff extends AbstractCommand implements CLICommand {
         }
 
         DiffEntry entry;
-        while (entries.hasNext()) {
-            entry = entries.next();
-            printer.print(geogig, cli.getConsole(), entry);
+        Console console = null;
+        if (filepath == null) {
+            console = cli.getConsole();
+            while (entries.hasNext()) {
+                entry = entries.next();
+                printer.print(geogig, console, entry);
+            }
+        } else {
+            /*
+             * InputStream in = new ByteArrayInputStream(new byte[0]); OutputStream out =
+             * java.nio.file.Files.newOutputStream(Paths.get(filepath)); console = new Console(in,
+             * new BufferedOutputStream(out)).disableAnsi();
+             */
+            printer.print(geogig, filepath, entries);
+
         }
+
+
     }
 
     private boolean pathExists(String filepath) {

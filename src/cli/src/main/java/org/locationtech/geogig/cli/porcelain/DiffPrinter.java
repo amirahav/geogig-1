@@ -56,6 +56,8 @@ interface DiffPrinter {
      */
     void print(GeoGIG geogig, Console console, DiffEntry entry) throws IOException;
 
+    void print(GeoGIG geogig, String filepath, Iterator<DiffEntry> entries) throws IOException;
+
 }
 
 class SummaryDiffPrinter implements DiffPrinter {
@@ -112,6 +114,13 @@ class SummaryDiffPrinter implements DiffPrinter {
         return path;
     }
 
+    @Override
+    public void print(GeoGIG geogig, String filepath, Iterator<DiffEntry> entries)
+            throws IOException {
+        // TODO Auto-generated method stub
+
+    }
+
 }
 
 class FullDiffPrinter implements DiffPrinter {
@@ -126,6 +135,7 @@ class FullDiffPrinter implements DiffPrinter {
         this.noGeom = noGeom;
         this.noHeader = noHeader;
     }
+
 
     @Override
     public void print(GeoGIG geogig, Console console, DiffEntry diffEntry) throws IOException {
@@ -206,6 +216,13 @@ class FullDiffPrinter implements DiffPrinter {
             }
             console.println();
         }
+
+    }
+
+    @Override
+    public void print(GeoGIG geogig, String filepath, Iterator<DiffEntry> entries)
+            throws IOException {
+        // TODO Auto-generated method stub
 
     }
 }
