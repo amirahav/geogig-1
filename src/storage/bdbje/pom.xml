@@ -60,6 +60,7 @@
       <artifactId>mockito-all</artifactId>
       <scope>test</scope>
     </dependency>
+
   </dependencies>
 
   <build>

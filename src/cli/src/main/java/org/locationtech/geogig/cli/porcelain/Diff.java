@@ -9,6 +9,7 @@
  */
 package org.locationtech.geogig.cli.porcelain;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -41,6 +42,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.common.io.Files;
 
 /**
  * Shows changes between commits, commits and working tree, etc.
@@ -85,6 +87,9 @@ public class Diff extends AbstractCommand implements CLICommand {
     @Parameter(names = "--count", description = "Only count the number of changes between the two trees")
     private boolean count;
 
+    @Parameter(names = "--filepath", description = "Local file path for exporting output to shapefile, needs to end with filename and .shp extension")
+    private String filepath;
+
     /**
      * Executes the diff command with the specified options.
      */
@@ -92,6 +97,12 @@ public class Diff extends AbstractCommand implements CLICommand {
     protected void runInternal(GeogigCLI cli) throws IOException {
         checkParameter(refSpec.size() <= 2, "Commit list is too long :%s", refSpec);
         checkParameter(!(nogeom && summary), "Only one printing mode allowed");
+        checkParameter(!(filepath != null && nogeom), "Shapefile export requires geometry");
+        checkParameter(
+                !(filepath != null && !Files.getFileExtension(filepath).equalsIgnoreCase("shp")),
+                "Shapefile export path should end with .shp");
+        checkParameter(!(filepath != null && !pathExists(filepath)),
+                "File path is not accessible");
         checkParameter(!(bounds && count), "Only one of --bounds or --count is allowed");
         checkParameter(!(cached && refSpec.size() > 1),
                 "--cached allows zero or one ref specs to compare the index with.");
@@ -155,7 +166,9 @@ public class Diff extends AbstractCommand implements CLICommand {
             cli.getConsole().println("No differences found");
             return;
         }
-
+        if (filepath != null) {
+            System.out.println(filepath);
+        }
         DiffPrinter printer;
         if (summary) {
             printer = new SummaryDiffPrinter();
@@ -168,6 +181,14 @@ public class Diff extends AbstractCommand implements CLICommand {
             entry = entries.next();
             printer.print(geogig, cli.getConsole(), entry);
         }
+    }
+
+    private boolean pathExists(String filepath) {
+        File file = new File(filepath);
+        String absolutePath = file.getAbsolutePath();
+        String dirPath = absolutePath.substring(0, absolutePath.lastIndexOf(File.separator));
+        File dir = new File(dirPath);
+        return dir.isDirectory();
     }
 
     private List<String> removeEmptyPaths() {
