@@ -16,13 +16,25 @@ import static org.fusesource.jansi.Ansi.Color.YELLOW;
 import static org.locationtech.geogig.api.plumbing.diff.DiffEntry.ChangeType.ADDED;
 import static org.locationtech.geogig.api.plumbing.diff.DiffEntry.ChangeType.MODIFIED;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.fusesource.jansi.Ansi;
+import org.geotools.data.DefaultTransaction;
+import org.geotools.data.Transaction;
+import org.geotools.data.shapefile.ShapefileDataStore;
+import org.geotools.data.shapefile.ShapefileDataStoreFactory;
+import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.simple.SimpleFeatureStore;
+import org.geotools.feature.FeatureCollections;
+import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.locationtech.geogig.api.GeoGIG;
 import org.locationtech.geogig.api.NodeRef;
 import org.locationtech.geogig.api.ObjectId;
@@ -38,8 +50,10 @@ import org.locationtech.geogig.api.plumbing.diff.FeatureDiff;
 import org.locationtech.geogig.api.plumbing.diff.GeometryAttributeDiff;
 import org.locationtech.geogig.api.plumbing.diff.LCSGeometryDiffImpl;
 import org.locationtech.geogig.cli.AnsiDecorator;
+import org.locationtech.geogig.cli.CommandFailedException;
 import org.locationtech.geogig.cli.Console;
 import org.locationtech.geogig.storage.text.TextValueSerializer;
+import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.PropertyDescriptor;
 
 import com.google.common.base.Optional;
@@ -222,7 +236,53 @@ class FullDiffPrinter implements DiffPrinter {
     @Override
     public void print(GeoGIG geogig, String filepath, Iterator<DiffEntry> entries)
             throws IOException {
-        // TODO Auto-generated method stub
+        boolean firstentryprocessed = false;
+        SimpleFeatureStore featureStore = null;
+        SimpleFeatureCollection featurecollection = FeatureCollections.newCollection();
+        SimpleFeatureBuilder builder = null;
+        while (entries.hasNext()) {
+            DiffEntry entry = entries.next();
+            if (!firstentryprocessed) {
+                NodeRef noderef = entry.getNewObject();
+                RevFeatureType featureType = geogig.command(RevObjectParse.class)
+                        .setObjectId(noderef.getMetadataId())
+                        .call(RevFeatureType.class).get();
+                ShapefileDataStoreFactory dataStoreFactory = new ShapefileDataStoreFactory();
+                File file = new File(filepath);
+                Map<String, Serializable> params = new HashMap<String, Serializable>();
+                params.put(ShapefileDataStoreFactory.URLP.key, file.toURI().toURL());
+                params.put(ShapefileDataStoreFactory.CREATE_SPATIAL_INDEX.key, Boolean.FALSE);
+                params.put(ShapefileDataStoreFactory.ENABLE_SPATIAL_INDEX.key, Boolean.FALSE);
+                ShapefileDataStore dataStore = (ShapefileDataStore) dataStoreFactory
+                        .createNewDataStore(params);
+                dataStore.createSchema((SimpleFeatureType) featureType.getType());
+                builder = new SimpleFeatureBuilder((SimpleFeatureType) featureType.getType());
+                final String typeName = dataStore.getTypeNames()[0];
+                final SimpleFeatureSource featureSource = dataStore.getFeatureSource(typeName);
+                if (!(featureSource instanceof SimpleFeatureStore)) {
+                    throw new CommandFailedException("Could not create feature store.");
+                }
+                featureStore = (SimpleFeatureStore) featureSource;
+                Transaction transaction = new DefaultTransaction("create");
+                featureStore.setTransaction(transaction);
+                firstentryprocessed = true;
+
+            }
+            if (entry.changeType() == ChangeType.MODIFIED) {
+                FeatureDiff diff = geogig.command(DiffFeature.class)
+                        .setNewVersion(Suppliers.ofInstance(entry.getNewObject()))
+                        .setOldVersion(Suppliers.ofInstance(entry.getOldObject())).call();
+
+                Map<PropertyDescriptor, AttributeDiff> diffs = diff.getDiffs();
+            } else if (entry.changeType() == ChangeType.ADDED) {
+                NodeRef noderef = entry.getNewObject();
+                RevFeatureType featureType = geogig.command(RevObjectParse.class)
+                        .setObjectId(noderef.getMetadataId()).call(RevFeatureType.class).get();
+                Optional<RevObject> obj = geogig.command(RevObjectParse.class)
+                        .setObjectId(noderef.getObjectId()).call();
+                RevFeature feature = (RevFeature) obj.get();
+            }
+        }
 
     }
 }
