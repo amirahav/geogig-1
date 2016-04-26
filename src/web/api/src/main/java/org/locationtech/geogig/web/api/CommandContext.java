@@ -35,4 +35,6 @@ public interface CommandContext {
      */
     void setResponseContent(StreamResponse responseContent);
 
+    void setResponseContent(ByteResponse responseContent);
+
 }

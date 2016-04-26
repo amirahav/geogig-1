@@ -13,10 +13,12 @@ import static org.locationtech.geogig.rest.Variants.CSV;
 import static org.locationtech.geogig.rest.Variants.CSV_MEDIA_TYPE;
 import static org.locationtech.geogig.rest.Variants.JSON;
 import static org.locationtech.geogig.rest.Variants.XML;
+import static org.locationtech.geogig.rest.Variants.ZIP;
 import static org.locationtech.geogig.rest.Variants.getVariantByExtension;
 import static org.locationtech.geogig.rest.repository.RESTUtils.getGeogig;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Writer;
 import java.util.List;
 import java.util.UUID;
@@ -30,8 +32,10 @@ import javax.xml.stream.XMLStreamWriter;
 import org.codehaus.jettison.mapped.MappedNamespaceConvention;
 import org.codehaus.jettison.mapped.MappedXMLStreamWriter;
 import org.locationtech.geogig.api.GeoGIG;
+import org.locationtech.geogig.rest.ByteRepresentation;
 import org.locationtech.geogig.rest.RestletException;
 import org.locationtech.geogig.rest.WriterRepresentation;
+import org.locationtech.geogig.web.api.ByteResponse;
 import org.locationtech.geogig.web.api.CommandBuilder;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.CommandResponse;
@@ -64,6 +68,7 @@ public class CommandResource extends Resource {
         variants.add(XML);
         variants.add(JSON);
         variants.add(CSV);
+        variants.add(ZIP);
     }
 
     @Override
@@ -89,6 +94,8 @@ public class CommandResource extends Resource {
         String commandName = (String) getRequest().getAttributes().get("command");
         MediaType format = resolveFormat(options, variant);
         try {
+            if (format == MediaType.APPLICATION_ZIP)
+                options.add("zip", "true");
             ParameterSet params = new FormParams(options);
             command = CommandBuilder.build(commandName, params);
             assert command != null;
@@ -156,6 +163,8 @@ public class CommandResource extends Resource {
                 retval = MediaType.APPLICATION_JSON;
             } else if (requested.equalsIgnoreCase("csv")) {
                 retval = CSV_MEDIA_TYPE;
+            } else if (requested.equalsIgnoreCase("zip")) {
+                retval = MediaType.APPLICATION_ZIP;
             } else {
                 throw new RestletException("Invalid output_format '" + requested + "'",
                         org.restlet.data.Status.CLIENT_ERROR_BAD_REQUEST);
@@ -169,6 +178,8 @@ public class CommandResource extends Resource {
         CommandResponse responseContent = null;
 
         StreamResponse streamContent = null;
+
+        ByteResponse byteContent = null;
 
         final GeoGIG geogig;
 
@@ -187,7 +198,17 @@ public class CommandResource extends Resource {
                     throw new CommandSpecException(
                             "Unsupported Media Type: This response is only compatible with text/csv.");
                 }
-                return new StreamWriterRepresentation(format, streamContent);
+                if (format == CSV_MEDIA_TYPE)
+                    return new StreamWriterRepresentation(format, streamContent);
+
+            }
+            if (byteContent != null) {
+                if (format != MediaType.APPLICATION_ZIP) {
+                    throw new CommandSpecException(
+                            "Unsupported Media Type: This response is only compatible with zip.");
+                }
+                if (format == MediaType.APPLICATION_ZIP)
+                    return new ByteWriterRepresentation(format, byteContent);
             }
             if (format != MediaType.APPLICATION_JSON && format != MediaType.APPLICATION_XML) {
                 throw new CommandSpecException(
@@ -204,6 +225,11 @@ public class CommandResource extends Resource {
         @Override
         public void setResponseContent(StreamResponse responseContent) {
             this.streamContent = responseContent;
+        }
+
+        @Override
+        public void setResponseContent(ByteResponse responseContent) {
+            this.byteContent = responseContent;
         }
     }
 
@@ -275,5 +301,25 @@ public class CommandResource extends Resource {
                 throw new IOException(e);
             }
         }
+    }
+
+    static class ByteWriterRepresentation extends ByteRepresentation {
+
+        final ByteResponse impl;
+
+        public ByteWriterRepresentation(MediaType mediaType, ByteResponse impl) {
+            super(mediaType);
+            this.impl = impl;
+        }
+
+        @Override
+        public void write(OutputStream writer) throws IOException {
+            try {
+                impl.write(writer);
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
+        }
+
     }
 }

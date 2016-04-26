@@ -9,6 +9,9 @@
  */
 package org.locationtech.geogig.web.api.commands;
 
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.io.Writer;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -17,6 +20,8 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.geotools.util.Range;
 import org.locationtech.geogig.api.Context;
@@ -36,6 +41,7 @@ import org.locationtech.geogig.api.porcelain.DiffOp;
 import org.locationtech.geogig.api.porcelain.LogOp;
 import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
+import org.locationtech.geogig.web.api.ByteResponse;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.CommandResponse;
 import org.locationtech.geogig.web.api.CommandSpecException;
@@ -80,6 +86,8 @@ public class Log extends AbstractWebAPICommand {
     boolean returnRange = false;
 
     boolean summary = false;
+
+    boolean zip = false;
 
     /**
      * Mutator for the limit variable
@@ -188,6 +196,16 @@ public class Log extends AbstractWebAPICommand {
      */
     public void setSummary(boolean summary) {
         this.summary = summary;
+    }
+
+    /**
+     * Mutator for the zip variable
+     * 
+     * @param summary - if true, return all changes from each commit in shapefile
+     */
+
+    public void setZip(boolean zip) {
+        this.zip = zip;
     }
 
     /**
@@ -309,13 +327,23 @@ public class Log extends AbstractWebAPICommand {
             });
         } else if (summary) {
             if (paths != null && paths.size() > 0) {
-                context.setResponseContent(new StreamResponse() {
+                if (!zip) {
+                    context.setResponseContent(new StreamResponse() {
 
-                    @Override
-                    public void write(Writer out) throws Exception {
-                        writeCSV(context.getGeoGIG(), out, log);
-                    }
-                });
+                        @Override
+                        public void write(Writer out) throws Exception {
+                            writeCSV(context.getGeoGIG(), out, log);
+                        }
+                    });
+                } else {
+                    context.setResponseContent(new ByteResponse() {
+
+                        @Override
+                        public void write(OutputStream out) throws Exception {
+                            writeZIP(context.getGeoGIG(), out, log);
+                        }
+                    });
+                }
             } else {
                 throw new CommandSpecException(
                         "You must specify a feature type path when getting a summary.");
@@ -466,6 +494,31 @@ public class Log extends AbstractWebAPICommand {
             // Couldn't resolve FeatureType
             throw new CommandSpecException("Couldn't resolve the given path to a feature type.");
         }
+    }
+
+    private void writeZIP(GeoGIG geogig, OutputStream out, Iterator<RevCommit> log)
+            throws Exception {
+        System.out.println("zip!");
+
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(baos));
+        StringBuilder sb = new StringBuilder();
+        sb.append("Test streghtsfas");
+        byte[] test = sb.toString().getBytes();
+        ZipEntry e = new ZipEntry("mytext.txt");
+        e.setSize(test.length);
+        zip.putNextEntry(e);
+        zip.write(test);
+        // wos.flush();
+        zip.closeEntry();
+        zip.finish();
+        zip.flush();
+        zip.close();
+        baos.flush();
+        out.write(baos.toByteArray());
+        out.flush();
+
     }
 
     public class CommitWithChangeCounts {

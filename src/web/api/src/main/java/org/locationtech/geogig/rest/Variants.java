@@ -22,11 +22,14 @@ public class Variants {
     public static final MediaType CSV_MEDIA_TYPE = new MediaType("text/csv",
             "Comma-separated Values");
 
+
     public static final Variant JSON = new Variant(MediaType.APPLICATION_JSON);
 
     public static final Variant XML = new Variant(MediaType.APPLICATION_XML);
 
     public static final Variant CSV = new Variant(CSV_MEDIA_TYPE);
+
+    public static final Variant ZIP = new Variant(MediaType.APPLICATION_ZIP);
 
     public static Optional<Variant> getVariantByExtension(Request request, List<Variant> supported) {
         String extension = RESTUtils.getStringAttribute(request, "extension");
@@ -37,6 +40,8 @@ public class Variants {
             v = JSON;
         } else if ("csv".equals(extension) && supported.contains(CSV)) {
             v = CSV;
+        } else if ("zip".equals(extension) && supported.contains(ZIP)) {
+            v = ZIP;
         }
         return Optional.fromNullable(v);
     }
