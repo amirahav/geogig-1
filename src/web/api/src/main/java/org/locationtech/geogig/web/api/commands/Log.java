@@ -11,18 +11,34 @@ package org.locationtech.geogig.web.api.commands;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.eclipse.jdt.annotation.Nullable;
+import org.geotools.data.shapefile.ShapefileDataStore;
+import org.geotools.data.shapefile.ShapefileDataStoreFactory;
+import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.simple.SimpleFeatureStore;
+import org.geotools.feature.simple.SimpleFeatureBuilder;
+import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.util.Range;
 import org.locationtech.geogig.api.Context;
 import org.locationtech.geogig.api.GeoGIG;
@@ -39,6 +55,8 @@ import org.locationtech.geogig.api.plumbing.RevParse;
 import org.locationtech.geogig.api.plumbing.diff.DiffEntry;
 import org.locationtech.geogig.api.porcelain.DiffOp;
 import org.locationtech.geogig.api.porcelain.LogOp;
+import org.locationtech.geogig.cli.CommandFailedException;
+import org.locationtech.geogig.geotools.plumbing.ExportDiffOp;
 import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
 import org.locationtech.geogig.web.api.ByteResponse;
@@ -47,6 +65,11 @@ import org.locationtech.geogig.web.api.CommandResponse;
 import org.locationtech.geogig.web.api.CommandSpecException;
 import org.locationtech.geogig.web.api.ResponseWriter;
 import org.locationtech.geogig.web.api.StreamResponse;
+import org.opengis.feature.Feature;
+import org.opengis.feature.GeometryAttribute;
+import org.opengis.feature.Property;
+import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.PropertyDescriptor;
 
 import com.google.common.base.Function;
@@ -498,27 +521,117 @@ public class Log extends AbstractWebAPICommand {
 
     private void writeZIP(GeoGIG geogig, OutputStream out, Iterator<RevCommit> log)
             throws Exception {
+        Path temppath = null;
+        try {
         System.out.println("zip!");
+            temppath = Files.createTempDirectory("difflog");
+            File shppath = temppath.toFile();
+            File shpfile = new File(temppath.toString(), "log.shp");
+            ShapefileDataStoreFactory dataStoreFactory = new ShapefileDataStoreFactory();
+            Map<String, Serializable> params = new HashMap<String, Serializable>();
+            params.put(ShapefileDataStoreFactory.URLP.key, shpfile.toURI().toURL());
+            params.put(ShapefileDataStoreFactory.CREATE_SPATIAL_INDEX.key, Boolean.FALSE);
+            params.put(ShapefileDataStoreFactory.ENABLE_SPATIAL_INDEX.key, Boolean.FALSE);
 
+            ShapefileDataStore dataStore = (ShapefileDataStore) dataStoreFactory
+                    .createNewDataStore(params);
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(baos));
-        StringBuilder sb = new StringBuilder();
-        sb.append("Test streghtsfas");
-        byte[] test = sb.toString().getBytes();
-        ZipEntry e = new ZipEntry("mytext.txt");
-        e.setSize(test.length);
-        zip.putNextEntry(e);
-        zip.write(test);
-        // wos.flush();
-        zip.closeEntry();
+            String path = paths.get(0);
+            // This is the feature type object
+            Optional<NodeRef> ref = geogig.command(FindTreeChild.class).setChildPath(path)
+                    .setParent(geogig.getRepository().workingTree().getTree()).call();
+            Optional<RevObject> type = Optional.absent();
+            if (ref.isPresent()) {
+                type = geogig.command(RevObjectParse.class)
+                        .setRefSpec(ref.get().getMetadataId().toString()).call();
+            } else {
+                throw new CommandSpecException("Couldn't resolve the given path.");
+            }
+            if (type.isPresent() && type.get() instanceof RevFeatureType) {
+                RevFeatureType featureType = (RevFeatureType) type.get();
+                SimpleFeatureType outputFeatureType = (SimpleFeatureType) featureType.type();
+                SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
+                builder.add(ExportDiffOp.CHANGE_TYPE_NAME, String.class);
+                for (AttributeDescriptor descriptor : outputFeatureType.getAttributeDescriptors()) {
+                    builder.add(descriptor);
+                }
+                builder.setName(outputFeatureType.getName());
+                builder.setCRS(outputFeatureType.getCoordinateReferenceSystem());
+                outputFeatureType = builder.buildFeatureType();
+
+                dataStore.createSchema(outputFeatureType);
+
+                final String typeName = dataStore.getTypeNames()[0];
+                final SimpleFeatureSource featureSource = dataStore.getFeatureSource(typeName);
+                if (!(featureSource instanceof SimpleFeatureStore)) {
+                    throw new CommandFailedException("Could not create feature store.");
+                }
+                final SimpleFeatureStore featureStore = (SimpleFeatureStore) featureSource;
+                RevCommit commit = null;
+
+                while (log.hasNext()) {
+                    commit = log.next();
+                    String parentId = commit.getParentIds().size() >= 1
+                            ? commit.getParentIds().get(0).toString() : ObjectId.NULL.toString();
+                    Function<Feature, Optional<Feature>> function = getTransformingFunction(
+                            dataStore.getSchema());
+
+                    ExportDiffOp op = geogig.command(ExportDiffOp.class)
+                            .setFeatureStore(featureStore).setPath(path).setOldRef(parentId)
+                            .setNewRef(commit.getId().toString()).setUseOld(false)
+                            .setTransactional(false).setFeatureTypeConversionFunction(function);
+
+                }
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(baos));
+                zipDirectory(shppath, zip);
+                baos.flush();
+                out.write(baos.toByteArray());
+                out.flush();
+            } else {
+                // Couldn't resolve FeatureType
+                throw new CommandSpecException(
+                        "Couldn't resolve the given path to a feature type.");
+            }
+
+        } finally {
+            deleteDirectory(temppath);
+        }
+
+    }
+
+    private void deleteDirectory(Path temppath) throws IOException {
+        if (temppath != null) {
+            File[] files = temppath.toFile().listFiles();
+            for (int j = 0; j < files.length; j++) {
+                File file = files[j];
+                file.delete();
+            }
+            Files.delete(temppath);
+        }
+    }
+
+    private void zipDirectory(File shppath, ZipOutputStream zip)
+            throws IOException, FileNotFoundException {
+        File[] shpdirfiles = shppath.listFiles();
+        for (int i = 0; i < shpdirfiles.length; i++) {
+            byte[] buffer = new byte[1024];
+            File file = shpdirfiles[i];
+            ZipEntry e = new ZipEntry(file.getName());
+            zip.putNextEntry(e);
+            FileInputStream fis = new FileInputStream(file);
+            int length;
+            while ((length = fis.read(buffer)) > 0) {
+                zip.write(buffer, 0, length);
+            }
+            zip.closeEntry();
+            fis.close();
+        }
+
         zip.finish();
         zip.flush();
         zip.close();
-        baos.flush();
-        out.write(baos.toByteArray());
-        out.flush();
-
     }
 
     public class CommitWithChangeCounts {
@@ -562,4 +675,30 @@ public class Log extends AbstractWebAPICommand {
         }
         return returnStr;
     }
+
+    private Function<Feature, Optional<Feature>> getTransformingFunction(
+            final SimpleFeatureType featureType) {
+        Function<Feature, Optional<Feature>> function = new Function<Feature, Optional<Feature>>() {
+
+            @Override
+            @Nullable
+            public Optional<Feature> apply(@Nullable Feature feature) {
+                SimpleFeatureBuilder builder = new SimpleFeatureBuilder(featureType);
+                for (Property property : feature.getProperties()) {
+                    if (property instanceof GeometryAttribute) {
+                        builder.set(featureType.getGeometryDescriptor().getName(),
+                                property.getValue());
+                    } else {
+                        builder.set(property.getName(), property.getValue());
+                    }
+                }
+                Feature modifiedFeature = builder.buildFeature(feature.getIdentifier().getID());
+                return Optional.fromNullable(modifiedFeature);
+            }
+
+        };
+
+        return function;
+    }
+
 }
