@@ -139,7 +139,7 @@ public class WorkingTree {
      */
     public synchronized RevTree getTree() {
         Optional<ObjectId> workTreeId = context.command(ResolveTreeish.class)
-                .setTreeish(Ref.WORK_HEAD).call();
+                .setTreeish(Ref.HEAD).call();
 
         RevTree workTree = RevTree.EMPTY;
 

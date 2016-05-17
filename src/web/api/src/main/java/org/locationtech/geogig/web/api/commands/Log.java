@@ -56,6 +56,7 @@ import org.locationtech.geogig.api.plumbing.diff.DiffEntry;
 import org.locationtech.geogig.api.porcelain.DiffOp;
 import org.locationtech.geogig.api.porcelain.LogOp;
 import org.locationtech.geogig.cli.CommandFailedException;
+import org.locationtech.geogig.geotools.plumbing.ExportBatchDiffOp;
 import org.locationtech.geogig.geotools.plumbing.ExportDiffOp;
 import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
@@ -567,7 +568,7 @@ public class Log extends AbstractWebAPICommand {
                     throw new CommandFailedException("Could not create feature store.");
                 }
                 final SimpleFeatureStore featureStore = (SimpleFeatureStore) featureSource;
-                RevCommit commit = null;
+                /*               RevCommit commit = null;
 
                 while (log.hasNext()) {
                     commit = log.next();
@@ -576,12 +577,17 @@ public class Log extends AbstractWebAPICommand {
                     Function<Feature, Optional<Feature>> function = getTransformingFunction(
                             dataStore.getSchema());
 
-                    ExportDiffOp op = geogig.command(ExportDiffOp.class)
+                    ExportBatchDiffOp op = geogig.command(ExportBatchDiffOp.class)
                             .setFeatureStore(featureStore).setPath(path).setOldRef(parentId)
                             .setNewRef(commit.getId().toString()).setUseOld(false)
                             .setTransactional(false).setFeatureTypeConversionFunction(function);
 
-                }
+                }*/
+                Function<Feature, Optional<Feature>> function = getTransformingFunction(
+                        dataStore.getSchema());
+                 geogig.command(ExportBatchDiffOp.class)
+                        .setFeatureStore(featureStore).setPath(path).setOldRefIterator(log)
+                        .setTransactional(false).setFeatureTypeConversionFunction(function).call();
 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(baos));
