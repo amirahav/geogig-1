@@ -66,6 +66,9 @@ public class ShpExportDiff extends AbstractShpCommand implements CLICommand {
     @Parameter(names = { "--old" }, description = "Export features from the old version instead of the most recent one")
     public boolean old;
 
+    @Parameter(names = { "--nochangetype", "-n" }, description = "Exclude changetype column from the output shapefile")
+    public boolean nochangetype = false;
+
     /**
      * Executes the export command using the provided options.
      */
