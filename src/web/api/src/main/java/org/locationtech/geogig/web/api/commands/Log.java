@@ -586,21 +586,7 @@ public class Log extends AbstractWebAPICommand {
                     throw new CommandFailedException("Could not create feature store.");
                 }
                 final SimpleFeatureStore featureStore = (SimpleFeatureStore) featureSource;
-                /*
-                 * RevCommit commit = null;
-                 * 
-                 * while (log.hasNext()) { commit = log.next(); String parentId =
-                 * commit.getParentIds().size() >= 1 ? commit.getParentIds().get(0).toString() :
-                 * ObjectId.NULL.toString(); Function<Feature, Optional<Feature>> function =
-                 * getTransformingFunction( dataStore.getSchema());
-                 * 
-                 * ExportBatchDiffOp op = geogig.command(ExportBatchDiffOp.class)
-                 * .setFeatureStore(featureStore).setPath(path).setOldRef(parentId)
-                 * .setNewRef(commit.getId().toString()).setUseOld(false)
-                 * .setTransactional(false).setFeatureTypeConversionFunction(function);
-                 * 
-                 * }
-                 */
+
                 Function<Feature, Optional<Feature>> function = getTransformingFunction(dataStore
                         .getSchema());
                 geogig.command(ExportBatchDiffOp.class).setFeatureStore(featureStore).setPath(path)
