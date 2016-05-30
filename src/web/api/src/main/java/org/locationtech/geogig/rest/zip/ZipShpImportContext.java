@@ -29,6 +29,7 @@ import org.locationtech.geogig.api.plumbing.merge.ReportMergeScenarioOp;
 import org.locationtech.geogig.api.porcelain.MergeConflictsException;
 import org.locationtech.geogig.geotools.plumbing.DataStoreImportOp;
 import org.locationtech.geogig.geotools.plumbing.DataStoreImportOp.DataStoreSupplier;
+import org.locationtech.geogig.geotools.plumbing.DefaultDataStoreImportOp;
 import org.locationtech.geogig.rest.AsyncCommandRepresentation;
 import org.locationtech.geogig.rest.AsyncContext.AsyncCommand;
 import org.locationtech.geogig.rest.CommandRepresentationFactory;
@@ -54,8 +55,10 @@ public class ZipShpImportContext implements DataStoreImportContextService {
 
     @Override
     public DataStoreSupplier getDataStore(ParameterSet options) {
-        // TODO Auto-generated method stub
-        return null;
+        if (dataStoreSupplier == null) {
+            dataStoreSupplier = new ZipShpDataStoreSupplier(options);
+        }
+        return dataStoreSupplier;
     }
 
     @Override
@@ -65,8 +68,7 @@ public class ZipShpImportContext implements DataStoreImportContextService {
 
     @Override
     public DataStoreImportOp<RevCommit> createCommand(Context context, ParameterSet options) {
-        // TODO Auto-generated method stub
-        return null;
+        return context.command(DefaultDataStoreImportOp.class);
     }
 
     private static class ZipShpDataStoreSupplier implements DataStoreSupplier {
