@@ -89,6 +89,8 @@ public class TestContext extends ExternalResource {
 
         private StreamResponse streamResponse;
 
+        private ByteResponse byteResponse;
+
         private Function<MediaType, Representation> representation;
 
         private Method requestMethod = Method.GET;
@@ -142,6 +144,7 @@ public class TestContext extends ExternalResource {
         public void setResponseContent(StreamResponse responseContent) {
             this.streamResponse = responseContent;
             this.commandResponse = null;
+            this.byteResponse = null;
             this.representation = null;
         }
 
@@ -168,6 +171,15 @@ public class TestContext extends ExternalResource {
                 repoProvider = new SingleRepositoryProvider(repo.getGeogig());
             }
             return repoProvider;
+        }
+
+        @Override
+        public void setResponseContent(ByteResponse responseContent) {
+            this.streamResponse = null;
+            this.commandResponse = null;
+            this.byteResponse = responseContent;
+            this.representation = null;
+
         }
 
     }
