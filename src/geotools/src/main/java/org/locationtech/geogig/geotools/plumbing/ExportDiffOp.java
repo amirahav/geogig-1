@@ -14,7 +14,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.eclipse.jdt.annotation.Nullable;
 import org.geotools.data.DefaultTransaction;
 import org.geotools.data.Transaction;
 import org.geotools.data.simple.SimpleFeatureStore;
@@ -77,6 +76,8 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
 
     private boolean old;
 
+    private boolean nochangetype = false;
+
     private String newRef;
 
     private String oldRef;
@@ -109,7 +110,7 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 Iterator<DiffEntry> diffs = command(DiffOp.class).setOldVersion(oldRef)
                         .setNewVersion(newRef).setFilter(path).call();
 
-                final Iterator<SimpleFeature> plainFeatures = getFeatures(diffs, old,
+                final Iterator<SimpleFeature> plainFeatures = getFeatures(diffs, old, nochangetype,
                         objectDatabase(), defaultMetadataId, progressListener);
 
                 Iterator<Optional<Feature>> transformed = Iterators.transform(plainFeatures,
@@ -156,11 +157,15 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
     }
 
     private static Iterator<SimpleFeature> getFeatures(Iterator<DiffEntry> diffs,
-            final boolean old, final ObjectStore database, final ObjectId metadataId,
+            final boolean old, final boolean nochangetype, final ObjectStore database,
+            final ObjectId metadataId,
             final ProgressListener progressListener) {
-
-        final SimpleFeatureType featureType = addChangeTypeAttribute(database
-                .getFeatureType(metadataId));
+        final SimpleFeatureType featureType;
+        RevFeatureType rft = database.getFeatureType(metadataId);
+        if(!nochangetype)
+            featureType = addChangeTypeAttribute(rft);
+        else
+            featureType = (SimpleFeatureType) rft.type();
         final RevFeatureType revFeatureType = RevFeatureTypeImpl.build(featureType);
         final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(featureType);
 
@@ -172,11 +177,16 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
             final RevFeature revFeature = database.getFeature(nodeRef.getObjectId());
             ImmutableList<Optional<Object>> values = revFeature.getValues();
             for (int i = 0; i < values.size(); i++) {
-                String name = featureType.getDescriptor(i + 1).getLocalName();
+                String name;
+                if (!nochangetype)
+                    name = featureType.getDescriptor(i + 1).getLocalName();
+                else
+                    name = featureType.getDescriptor(i).getLocalName();
                 Object value = values.get(i).orNull();
                 featureBuilder.set(name, value);
             }
-            featureBuilder.set(CHANGE_TYPE_NAME, de.changeType().name().charAt(0));
+            if (!nochangetype)
+                featureBuilder.set(CHANGE_TYPE_NAME, de.changeType().name().charAt(0));
             Feature feature = featureBuilder.buildFeature(nodeRef.name());
             feature.getUserData().put(Hints.USE_PROVIDED_FID, true);
             feature.getUserData().put(RevFeature.class, revFeature);
@@ -319,6 +329,11 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
 
     public ExportDiffOp setUseOld(boolean old) {
         this.old = old;
+        return this;
+    }
+
+    public ExportDiffOp setUseNochangetype(boolean nochangetype) {
+        this.nochangetype = nochangetype;
         return this;
     }
 }
