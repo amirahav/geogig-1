@@ -41,8 +41,13 @@
     <dependency>
       <groupId>org.restlet</groupId>
       <artifactId>org.restlet.ext.fileupload</artifactId>
-      <version>${restlet.version}</version>
+      <version>${restlet.upload.version}</version>
     </dependency>
+	<dependency>
+	    <groupId>commons-fileupload</groupId>
+	    <artifactId>commons-fileupload</artifactId>
+	    <version>${commons.fileupload.version}</version>
+	</dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
