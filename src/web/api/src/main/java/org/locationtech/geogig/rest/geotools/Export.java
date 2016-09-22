@@ -26,6 +26,7 @@ import org.locationtech.geogig.rest.AsyncContext;
 import org.locationtech.geogig.rest.AsyncContext.AsyncCommand;
 import org.locationtech.geogig.rest.Representations;
 import org.locationtech.geogig.rest.geopkg.GeoPkgExportOutputFormat;
+import org.locationtech.geogig.rest.zip.ZipExportOutputFormat;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.ParameterSet;
@@ -145,6 +146,8 @@ public class Export extends AbstractWebAPICommand {
 
         if ("gpkg".equalsIgnoreCase(format)) {
             return new GeoPkgExportOutputFormat(options);
+        } else if ("zip".equalsIgnoreCase(format)) {
+            return new ZipExportOutputFormat(options);
         }
 
         throw new IllegalArgumentException("Unsupported output format: " + format);
