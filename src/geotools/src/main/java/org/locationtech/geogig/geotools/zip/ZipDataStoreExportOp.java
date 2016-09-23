@@ -1,5 +1,7 @@
 package org.locationtech.geogig.geotools.zip;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -7,30 +9,182 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import org.geotools.data.DataStore;
+import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.simple.SimpleFeatureStore;
+import org.geotools.feature.simple.SimpleFeatureBuilder;
+import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.referencing.CRS;
 import org.locationtech.geogig.api.ProgressListener;
+import org.locationtech.geogig.api.RevFeatureType;
+import org.locationtech.geogig.api.plumbing.ResolveFeatureType;
 import org.locationtech.geogig.geotools.plumbing.DataStoreExportOp;
+import org.locationtech.geogig.geotools.plumbing.ExportOp;
+import org.opengis.feature.Feature;
+import org.opengis.feature.GeometryAttribute;
+import org.opengis.feature.Property;
+import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
+import org.opengis.geometry.MismatchedDimensionException;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.NoSuchAuthorityCodeException;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.TransformException;
+
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
+import com.vividsolutions.jts.geom.Geometry;
 
 public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
 
     private File shape;
 
+    private Boolean doitt;
+    
+    // private List<String> removeFields =
+    // Arrays.asList("fromTocl","toFromcl","fromToNode","toFromNode","fromToHR","toFromHR");
+    private List<String> removeFields = Arrays.asList("note");
     public ZipDataStoreExportOp setShapeFile(File shape) {
         this.shape = shape;
         return this;
     }
 
+    public ZipDataStoreExportOp setDoittImport(boolean enable) {
+        this.doitt = enable;
+        return this;
+    }
 
     @Override
-    protected void export(final String refSpec, final DataStore targetStore,
+    protected void export(final String treeSpec, final DataStore targetStore,
             final String targetTableName, final ProgressListener progress) {
 
-        super.export(refSpec, targetStore, targetTableName, progress);
+        if (this.doitt) {
+
+            Optional<RevFeatureType> opType = command(ResolveFeatureType.class)
+                    .setRefSpec(treeSpec).call();
+            checkState(opType.isPresent());
+
+            SimpleFeatureType featureType = (SimpleFeatureType) opType.get().type();
+            CoordinateReferenceSystem worldCRS = getTargetCRS();
+            CoordinateReferenceSystem dataCRS = featureType.getCoordinateReferenceSystem();
+            SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
+
+            for (AttributeDescriptor descriptor : featureType.getAttributeDescriptors()) {
+                if (!removeFields.contains(descriptor.getLocalName()))
+                    builder.add(descriptor);
+            }
+            builder.setName(featureType.getName());
+            builder.setCRS(worldCRS);
+            SimpleFeatureType typeWithoutRemoved = builder.buildFeatureType();
 
 
+            SimpleFeatureType reprojFeatureType = SimpleFeatureTypeBuilder.retype(
+                    typeWithoutRemoved,
+                    worldCRS);
+
+
+
+            try {
+                targetStore.createSchema(reprojFeatureType);
+            } catch (IOException e) {
+                throw new IllegalStateException("Unable to create feature type from " + treeSpec);
+            }
+
+            SimpleFeatureSource featureSource;
+            try {
+                featureSource = targetStore.getFeatureSource(featureType.getName().getLocalPart());
+            } catch (IOException e) {
+                throw new IllegalStateException("Unable to obtain feature type once created: "
+                        + treeSpec);
+            }
+            checkState(featureSource instanceof SimpleFeatureStore,
+                    "FeatureSource is not writable: " + featureType.getName().getLocalPart());
+
+            SimpleFeatureStore featureStore = (SimpleFeatureStore) featureSource;
+
+            SimpleFeatureBuilder fbuilder = new SimpleFeatureBuilder(reprojFeatureType);
+
+
+
+            MathTransform transform;
+            try {
+                transform = CRS.findMathTransform(dataCRS, worldCRS, true);
+
+                /*
+                 * final Function<Feature, Optional<Feature>> function = (feature) -> {
+                 * SimpleFeature simpleFeature = (SimpleFeature) feature;
+                 * featureBuilder.add(simpleFeature.getAttribute(0));
+                 * featureBuilder.add(simpleFeature.getAttribute(2)); return Optional.of((Feature)
+                 * featureBuilder.buildFeature(null)); };
+                 */
+                final Function<Feature, Optional<Feature>> function = (feature) -> {
+
+                    for (Property property : feature.getProperties()) {
+                        if (property instanceof GeometryAttribute) {
+                            Geometry geometry = (Geometry) property.getValue();
+                            Geometry geometry2;
+                            try {
+                                geometry2 = JTS.transform(geometry, transform);
+                                fbuilder.set(featureType.getGeometryDescriptor().getName(),
+                                        geometry2);
+                            } catch (MismatchedDimensionException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            } catch (TransformException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }
+
+                        } else if (removeFields.contains(property.getName().toString())) {
+
+                        }else {
+
+                            fbuilder.set(property.getName(), property.getValue());
+                        }
+                    }
+                    Feature modifiedFeature = fbuilder
+                            .buildFeature(feature.getIdentifier().getID());
+
+                    return Optional.fromNullable(modifiedFeature);
+                };
+
+                command(ExportOp.class)//
+                        .setFeatureStore(featureStore)//
+                        .setPath(treeSpec)//
+                        .setFeatureTypeConversionFunction(function).setTransactional(true)//
+                        .setBBoxFilter(bboxFilter)//
+                        .setProgressListener(progress)//
+                        .call();
+
+            } catch (FactoryException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+            }
+        } else {
+            super.export(treeSpec, targetStore, targetTableName, progress);
+        }
+
+    }
+
+    private CoordinateReferenceSystem getTargetCRS() {
+        CoordinateReferenceSystem crsout = null;
+        try {
+            crsout = CRS.decode("EPSG:2263");
+        } catch (NoSuchAuthorityCodeException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (FactoryException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return crsout;
     }
 
     @Override

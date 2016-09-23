@@ -31,6 +31,15 @@ import com.google.common.collect.ImmutableMap;
 
 
 public class ZipExportOutputFormat extends Export.OutputFormat {
+    public static final String PATH_PARAM = "path";
+
+    public static final String DOITT_IMPORT_PARAM = "doitt";
+
+    private TempShpSupplier dataStore;
+
+    public String path;
+
+    public Boolean doitt;
 
     private static class TempShpSupplier implements Supplier<DataStore> {
 
@@ -85,12 +94,11 @@ public class ZipExportOutputFormat extends Export.OutputFormat {
 
     }
 
-    private TempShpSupplier dataStore;
 
-    public String path;
 
     public ZipExportOutputFormat(ParameterSet options) {
-        this.path = options.getValuesArray("path")[0];
+        this.path = options.getFirstValue(PATH_PARAM);
+        this.doitt = Boolean.parseBoolean(options.getFirstValue(DOITT_IMPORT_PARAM));
         this.dataStore = new TempShpSupplier(this.path);
     }
 
@@ -101,8 +109,9 @@ public class ZipExportOutputFormat extends Export.OutputFormat {
 
     @Override
     public DataStoreExportOp<File> createCommand(final CommandContext context) {
+        boolean doitt = this.doitt;
         return context.getGeoGIG().command(ZipDataStoreExportOp.class)
-                .setShapeFile(dataStore.getTargetFile());
+                .setShapeFile(dataStore.getTargetFile()).setDoittImport(doitt);
     }
 
     @Override
