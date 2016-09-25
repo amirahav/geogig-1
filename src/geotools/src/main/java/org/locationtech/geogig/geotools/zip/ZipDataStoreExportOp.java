@@ -48,9 +48,10 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
 
     private Boolean doitt;
     
-    // private List<String> removeFields =
-    // Arrays.asList("fromTocl","toFromcl","fromToNode","toFromNode","fromToHR","toFromHR");
-    private List<String> removeFields = Arrays.asList("note");
+    private List<String> removeFields = Arrays.asList("fromTocl", "toFromcl", "fromToNode",
+            "toFromNode", "fromToHR", "toFromHR");
+
+    // private List<String> removeFields = Arrays.asList("note");
     public ZipDataStoreExportOp setShapeFile(File shape) {
         this.shape = shape;
         return this;
@@ -59,6 +60,29 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
     public ZipDataStoreExportOp setDoittImport(boolean enable) {
         this.doitt = enable;
         return this;
+    }
+
+    private class FromTo {
+        private String toFromClass;
+
+        private String fromToClass;
+
+        public String getToFromClass() {
+            return toFromClass;
+        }
+
+        public void setToFromClass(String toFromClass) {
+            this.toFromClass = toFromClass;
+        }
+
+        public String getFromToClass() {
+            return fromToClass;
+        }
+
+        public void setFromToClass(String fromToClass) {
+            this.fromToClass = fromToClass;
+        }
+
     }
 
     @Override
@@ -80,6 +104,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                 if (!removeFields.contains(descriptor.getLocalName()))
                     builder.add(descriptor);
             }
+            builder.add("AllClasses", String.class);
             builder.setName(featureType.getName());
             builder.setCRS(worldCRS);
             SimpleFeatureType typeWithoutRemoved = builder.buildFeatureType();
@@ -125,6 +150,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                  * featureBuilder.buildFeature(null)); };
                  */
                 final Function<Feature, Optional<Feature>> function = (feature) -> {
+                    FromTo ft = new FromTo();
 
                     for (Property property : feature.getProperties()) {
                         if (property instanceof GeometryAttribute) {
@@ -143,12 +169,24 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                             }
 
                         } else if (removeFields.contains(property.getName().toString())) {
+                            if (property.getName().toString().equalsIgnoreCase("fromTocl")) {
+                                if (property.getValue() != null && !property.getValue().equals("")) {
+                                    ft.setFromToClass((String) property.getValue());
+                                }
+
+                            } else if (property.getName().toString().equalsIgnoreCase("toFromcl")) {
+                                if (property.getValue() != null && !property.getValue().equals("")) {
+                                    ft.setToFromClass((String) property.getValue());
+                                }
+
+                            }
 
                         }else {
 
                             fbuilder.set(property.getName(), property.getValue());
                         }
                     }
+                    fbuilder.set("AllClasses", mergeClasses(ft));
                     Feature modifiedFeature = fbuilder
                             .buildFeature(feature.getIdentifier().getID());
 
@@ -171,6 +209,17 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
             super.export(treeSpec, targetStore, targetTableName, progress);
         }
 
+    }
+
+    private String mergeClasses(FromTo ft) {
+        if (ft.getFromToClass() != null && ft.getToFromClass() != null)
+            return ft.getFromToClass() + "," + ft.getToFromClass();
+        else if (ft.getFromToClass() != null)
+            return ft.getFromToClass();
+        else if (ft.getToFromClass() != null)
+            return ft.getToFromClass();
+        else
+            return "";
     }
 
     private CoordinateReferenceSystem getTargetCRS() {
