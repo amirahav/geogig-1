@@ -164,6 +164,7 @@ public abstract class DataStoreExportOp<T> extends AbstractGeoGigOp<T> {
         command(ExportOp.class)//
                 .setFeatureStore(featureStore)//
                 .setPath(treeSpec)//
+                .exportDefaultFeatureType()
                 .setTransactional(true)//
                 .setBBoxFilter(this.bboxFilter)//
                 .setProgressListener(progress)//

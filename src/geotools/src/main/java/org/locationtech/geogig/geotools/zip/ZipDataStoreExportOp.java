@@ -196,6 +196,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                 command(ExportOp.class)//
                         .setFeatureStore(featureStore)//
                         .setPath(treeSpec)//
+                        .exportDefaultFeatureType().setAlter(true)
                         .setFeatureTypeConversionFunction(function).setTransactional(true)//
                         .setBBoxFilter(bboxFilter)//
                         .setProgressListener(progress)//

@@ -37,7 +37,6 @@ public class Variants {
     
     public static final Variant ZIP = new Variant(MediaType.APPLICATION_ZIP);
 
-    public static final Variant ZIP = new Variant(MediaType.APPLICATION_ZIP);
 
     public static Optional<Variant> getVariantByExtension(Request request, List<Variant> supported) {
         String extension = RESTUtils.getStringAttribute(request, "extension");
