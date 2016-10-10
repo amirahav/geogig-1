@@ -48,8 +48,9 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
 
     private Boolean doitt;
     
-    private List<String> removeFields = Arrays.asList("fromTocl", "toFromcl", "fromToNode",
-            "toFromNode", "fromToHR", "toFromHR");
+    //private List<String> removeFields = Arrays.asList("fromTocl", "toFromcl", "fromToNode",
+     //       "toFromNode", "fromToHR", "toFromHR");
+    private List<String> removeFields = Arrays.asList("fromTocl", "toFromcl");
 
     // private List<String> removeFields = Arrays.asList("note");
     public ZipDataStoreExportOp setShapeFile(File shape) {
@@ -104,7 +105,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                 if (!removeFields.contains(descriptor.getLocalName()))
                     builder.add(descriptor);
             }
-            builder.add("AllClasses", String.class);
+            builder.add("BikeLane", String.class);
             builder.setName(featureType.getName());
             builder.setCRS(worldCRS);
             SimpleFeatureType typeWithoutRemoved = builder.buildFeatureType();
@@ -186,7 +187,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                             fbuilder.set(property.getName(), property.getValue());
                         }
                     }
-                    fbuilder.set("AllClasses", mergeClasses(ft));
+                    fbuilder.set("BikeLane", mergeClasses(ft));
                     Feature modifiedFeature = fbuilder
                             .buildFeature(feature.getIdentifier().getID());
 
@@ -212,7 +213,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
 
     }
 
-    private String mergeClasses(FromTo ft) {
+/*    private String mergeClasses(FromTo ft) {
         if (ft.getFromToClass() != null && ft.getToFromClass() != null)
             return ft.getFromToClass() + "," + ft.getToFromClass();
         else if (ft.getFromToClass() != null)
@@ -221,6 +222,18 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
             return ft.getToFromClass();
         else
             return "";
+    }*/
+    private String mergeClasses(FromTo ft) {
+    	if(ft.getFromToClass().equalsIgnoreCase(ft.getToFromClass())){
+    		return ft.getFromToClass();
+    	}else{
+    		if(ft.getFromToClass().equals("1")&&ft.getToFromClass().equals("2"))
+    			return "5";
+    		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("3"))
+    			return "6";
+    	}
+    	return "";
+
     }
 
     private CoordinateReferenceSystem getTargetCRS() {
