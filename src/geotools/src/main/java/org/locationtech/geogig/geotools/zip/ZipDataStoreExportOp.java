@@ -188,7 +188,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                         }
                     }
                     fbuilder.set("BikeLane", mergeClasses(ft));
-                    if (feature.getProperty("BikeDir") == null || feature.getProperty("BikeDir").equals("")) 
+                    if (feature.getProperty("BikeDir").getValue() == null || feature.getProperty("BikeDir").getValue().equals("")) 
                     	fbuilder.set("BikeDir", bikeDirection(ft));
                     Feature modifiedFeature = fbuilder
                             .buildFeature(feature.getIdentifier().getID());
@@ -265,8 +265,10 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
     		return "Two-way";
     	}else if(ft.getFromToClass()!=null&&ft.getFromToClass()!=""){
     		return "With";
-    	}else{
+    	}else if(ft.getToFromClass()!=null&&ft.getToFromClass()!=""){
     		return "Against";
+    	}else{
+    		return "";
     	}
     }
 
