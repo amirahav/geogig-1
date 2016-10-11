@@ -226,25 +226,33 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
             return "";
     }*/
     private String mergeClasses(FromTo ft) {
-    	if(ft.getFromToClass().equalsIgnoreCase(ft.getToFromClass())){
-    		return ft.getFromToClass();
-    	}
-    	else{
-    		if(ft.getFromToClass().equals("1")&&ft.getToFromClass().equals("2"))
-    			return "5";
-    		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("3"))
-    			return "6";
-    		else if (ft.getFromToClass().equals("1")&&ft.getToFromClass().equals("3"))
-    			return "8";
-    		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("1"))
-    			return "9";
-    		else if (ft.getFromToClass().equals("3")&&ft.getToFromClass().equals("1"))
-    			return "10";
-    		else if (ft.getFromToClass().equals("3")&&ft.getToFromClass().equals("2"))
-    			return "11";
-    		else if(ft.getFromToClass()!=null&&!ft.getFromToClass().equals("")){
+    	if(ft.getFromToClass()!=null&&ft.getToFromClass()!=null){
+	    	if(ft.getFromToClass().equalsIgnoreCase(ft.getToFromClass())){
+	    		return ft.getFromToClass();
+	    	}
+	    	else{
+	    		if(ft.getFromToClass().equals("1")&&ft.getToFromClass().equals("2"))
+	    			return "5";
+	    		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("3"))
+	    			return "6";
+	    		else if (ft.getFromToClass().equals("1")&&ft.getToFromClass().equals("3"))
+	    			return "8";
+	    		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("1"))
+	    			return "9";
+	    		else if (ft.getFromToClass().equals("3")&&ft.getToFromClass().equals("1"))
+	    			return "10";
+	    		else if (ft.getFromToClass().equals("3")&&ft.getToFromClass().equals("2"))
+	    			return "11";
+	    		else if(!ft.getFromToClass().equals("")){
+	    			return ft.getFromToClass();
+	    		}else if(ft.getToFromClass().equals("")){
+	    			return ft.getToFromClass();
+	    		}
+	    	}
+    	}else{
+    		if(ft.getFromToClass()!=null){
     			return ft.getFromToClass();
-    		}else if(ft.getToFromClass()!=null&&ft.getToFromClass().equals("")){
+    		}else if(ft.getToFromClass()!=null){
     			return ft.getToFromClass();
     		}
     	}
