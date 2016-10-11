@@ -188,7 +188,7 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                         }
                     }
                     fbuilder.set("BikeLane", mergeClasses(ft));
-                    if (feature.getProperty("BikeDir") == null || feature.getProperty("BikeDir").equals("")) {
+                    if (feature.getProperty("BikeDir") == null || feature.getProperty("BikeDir").equals("")) 
                     	fbuilder.set("BikeDir", bikeDirection(ft));
                     Feature modifiedFeature = fbuilder
                             .buildFeature(feature.getIdentifier().getID());
@@ -234,6 +234,14 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
     			return "5";
     		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("3"))
     			return "6";
+    		else if (ft.getFromToClass().equals("1")&&ft.getToFromClass().equals("3"))
+    			return "8";
+    		else if (ft.getFromToClass().equals("2")&&ft.getToFromClass().equals("1"))
+    			return "9";
+    		else if (ft.getFromToClass().equals("3")&&ft.getToFromClass().equals("1"))
+    			return "10";
+    		else if (ft.getFromToClass().equals("3")&&ft.getToFromClass().equals("2"))
+    			return "11";
     		else if(ft.getFromToClass()!=null&&!ft.getFromToClass().equals("")){
     			return ft.getFromToClass();
     		}else if(ft.getToFromClass()!=null&&ft.getToFromClass().equals("")){
