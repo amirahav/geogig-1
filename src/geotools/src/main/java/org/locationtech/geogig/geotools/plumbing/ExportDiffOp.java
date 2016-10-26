@@ -74,6 +74,8 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
     private boolean transactional;
 
     private boolean old;
+    
+    private boolean nochangetype = false;
 
     private String newRef;
 
@@ -106,7 +108,7 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 @Override
                 public FeatureIterator<SimpleFeature> features() {
 
-                    final Iterator<SimpleFeature> plainFeatures = getFeatures(diffs, old,
+                    final Iterator<SimpleFeature> plainFeatures = getFeatures(diffs, old, nochangetype,
                             objectDatabase(), defaultMetadataId, progressListener);
 
                     Iterator<Optional<Feature>> transformed = Iterators.transform(plainFeatures,
@@ -154,11 +156,14 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
     }
 
     private static AutoCloseableIterator<SimpleFeature> getFeatures(
-            AutoCloseableIterator<DiffEntry> diffs, final boolean old, final ObjectStore database,
+            AutoCloseableIterator<DiffEntry> diffs, final boolean old, final boolean nochangetype, final ObjectStore database,
             final ObjectId metadataId, final ProgressListener progressListener) {
-
-        final SimpleFeatureType featureType = addChangeTypeAttribute(
-                database.getFeatureType(metadataId));
+    	final SimpleFeatureType featureType;
+    	if(!nochangetype)
+    		featureType = addChangeTypeAttribute(
+    				database.getFeatureType(metadataId));
+    	else
+    		featureType = (SimpleFeatureType)database.getFeatureType(metadataId);
         final RevFeatureType revFeatureType = RevFeatureTypeBuilder.build(featureType);
         final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(featureType);
 
@@ -169,11 +174,16 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
             }
             final RevFeature revFeature = database.getFeature(nodeRef.getObjectId());
             for (int i = 0; i < revFeature.size(); i++) {
-                String name = featureType.getDescriptor(i + 1).getLocalName();
+            	String name;
+                if (!nochangetype)
+                    name = featureType.getDescriptor(i + 1).getLocalName();
+                else
+                    name = featureType.getDescriptor(i).getLocalName();
                 Object value = revFeature.get(i).orNull();
                 featureBuilder.set(name, value);
             }
-            featureBuilder.set(CHANGE_TYPE_NAME, de.changeType().name().charAt(0));
+            if (!nochangetype)
+                featureBuilder.set(CHANGE_TYPE_NAME, de.changeType().name().charAt(0));
             Feature feature = featureBuilder.buildFeature(nodeRef.name());
             feature.getUserData().put(Hints.USE_PROVIDED_FID, true);
             feature.getUserData().put(RevFeature.class, revFeature);
@@ -317,6 +327,11 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
 
     public ExportDiffOp setUseOld(boolean old) {
         this.old = old;
+        return this;
+    }
+    
+    public ExportDiffOp setUseNochangetype(boolean nochangetype) {
+        this.nochangetype = nochangetype;
         return this;
     }
 }

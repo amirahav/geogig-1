@@ -9,9 +9,9 @@
  */
 package org.locationtech.geogig.test.integration.sqlite;
 
-import org.locationtech.geogig.api.Context;
-import org.locationtech.geogig.api.Platform;
-import org.locationtech.geogig.api.TestPlatform;
+import org.locationtech.geogig.repository.Context;
+import org.locationtech.geogig.repository.Platform;
+import org.locationtech.geogig.test.TestPlatform;
 import org.locationtech.geogig.di.GeogigModule;
 import org.locationtech.geogig.storage.sqlite.Xerial;
 import org.locationtech.geogig.storage.sqlite.XerialSQLiteModule;

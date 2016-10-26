@@ -9,7 +9,7 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
-import org.locationtech.geogig.api.plumbing.merge.Conflict;
+import org.locationtech.geogig.repository.Conflict;
 
 import com.google.common.base.Function;
 

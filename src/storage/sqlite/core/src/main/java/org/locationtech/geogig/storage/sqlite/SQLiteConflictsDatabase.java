@@ -11,7 +11,7 @@ package org.locationtech.geogig.storage.sqlite;
 
 import java.util.List;
 
-import org.locationtech.geogig.api.plumbing.merge.Conflict;
+import org.locationtech.geogig.repository.Conflict;
 import org.locationtech.geogig.storage.ConflictsDatabase;
 
 import com.google.common.base.Optional;

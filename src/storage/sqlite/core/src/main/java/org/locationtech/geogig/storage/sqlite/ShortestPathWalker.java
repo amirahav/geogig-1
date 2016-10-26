@@ -14,7 +14,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 
-import org.locationtech.geogig.api.ObjectId;
+import org.locationtech.geogig.model.ObjectId;
 
 import com.google.common.collect.Maps;
 

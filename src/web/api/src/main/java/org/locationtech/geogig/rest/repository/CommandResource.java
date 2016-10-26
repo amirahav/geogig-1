@@ -13,6 +13,7 @@ import static org.locationtech.geogig.rest.Variants.CSV;
 import static org.locationtech.geogig.rest.Variants.CSV_MEDIA_TYPE;
 import static org.locationtech.geogig.rest.Variants.JSON;
 import static org.locationtech.geogig.rest.Variants.XML;
+import static org.locationtech.geogig.rest.Variants.ZIP;
 import static org.locationtech.geogig.rest.Variants.getVariantByExtension;
 import static org.locationtech.geogig.rest.repository.RESTUtils.getGeogig;
 
@@ -25,6 +26,8 @@ import java.util.logging.Logger;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.repository.RepositoryBusyException;
 import org.locationtech.geogig.rest.RestletException;
+import org.locationtech.geogig.web.api.ByteResponse;
+import org.locationtech.geogig.web.api.ByteWriterRepresentation;
 import org.locationtech.geogig.web.api.CommandBuilder;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.CommandResponse;
@@ -64,6 +67,7 @@ public class CommandResource extends Resource {
         variants.add(XML);
         variants.add(JSON);
         variants.add(CSV);
+        variants.add(ZIP);
 
         final String commandName = getCommandName();
 
@@ -253,6 +257,8 @@ public class CommandResource extends Resource {
                 retval = MediaType.APPLICATION_JSON;
             } else if (requested.equalsIgnoreCase("csv")) {
                 retval = CSV_MEDIA_TYPE;
+            } else if (requested.equalsIgnoreCase("zip")) {
+            	 retval = MediaType.APPLICATION_ZIP;
             } else {
                 throw new RestletException("Invalid output_format '" + requested + "'",
                         org.restlet.data.Status.CLIENT_ERROR_BAD_REQUEST);
@@ -266,6 +272,8 @@ public class CommandResource extends Resource {
         CommandResponse responseContent = null;
 
         StreamResponse streamContent = null;
+        
+        ByteResponse byteContent = null;
 
         final Repository geogig;
 
@@ -296,6 +304,14 @@ public class CommandResource extends Resource {
         public Representation getRepresentation(MediaType format, String callback) {
             if (representation != null) {
                 return representation.apply(format);
+            }
+            if (byteContent != null) {
+                if (format != MediaType.APPLICATION_ZIP) {
+                    throw new CommandSpecException(
+                            "Unsupported Media Type: This response is only compatible with application/zip.");
+                }
+                return new ByteWriterRepresentation(format, byteContent);
+
             }
             if (streamContent != null) {
                 if (format != CSV_MEDIA_TYPE) {
@@ -334,6 +350,12 @@ public class CommandResource extends Resource {
         @Override
         public RepositoryProvider getRepositoryProvider() {
             return RESTUtils.repositoryProvider(request);
+        }
+        
+        @Override
+        public void setResponseContent(ByteResponse responseContent) {
+            this.byteContent = responseContent;
+
         }
 
     }

@@ -60,6 +60,7 @@ public class TaskResultDownloadResource extends Resource {
         getVariants().add(Variants.XML);
         getVariants().add(Variants.JSON);
         getVariants().add(Variants.GEOPKG);
+        getVariants().add(Variants.ZIP);
     }
 
     @Override
@@ -146,6 +147,8 @@ public class TaskResultDownloadResource extends Resource {
             return MediaType.TEXT_XML;
         } else if ("json".equalsIgnoreCase(extension)) {
             return Variants.JSON.getMediaType();
+        } else if ("zip".equalsIgnoreCase(extension)) {
+        	return Variants.ZIP.getMediaType();
         }
 
         return MediaType.APPLICATION_OCTET_STREAM;

@@ -89,6 +89,8 @@ public class TestContext extends ExternalResource {
         private CommandResponse commandResponse;
 
         private StreamResponse streamResponse;
+        
+        private ByteResponse byteResponse;
 
         private Function<MediaType, Representation> representation;
 
@@ -174,6 +176,15 @@ public class TestContext extends ExternalResource {
                 repoProvider = new SingleRepositoryProvider(repo.getGeogig().getRepository());
             }
             return repoProvider;
+        }
+        
+        @Override
+        public void setResponseContent(ByteResponse responseContent) {
+            this.streamResponse = null;
+            this.commandResponse = null;
+            this.byteResponse = responseContent;
+            this.representation = null;
+
         }
 
     }

@@ -15,7 +15,7 @@ import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
-import org.locationtech.geogig.api.Context;
+import org.locationtech.geogig.repository.Context;
 import org.locationtech.geogig.di.GeogigModule;
 import org.slf4j.Logger;
 import org.sqlite.SQLiteConfig.SynchronousMode;

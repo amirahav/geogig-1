@@ -77,7 +77,7 @@ public abstract class DataStoreExportOp<T> extends AbstractGeoGigOp<T> {
     private List<String> treePaths;
 
     @Nullable
-    private ReferencedEnvelope bboxFilter;
+    protected ReferencedEnvelope bboxFilter;
 
     public DataStoreExportOp<T> setTarget(Supplier<DataStore> supplier) {
         this.dataStore = supplier;
@@ -166,6 +166,7 @@ public abstract class DataStoreExportOp<T> extends AbstractGeoGigOp<T> {
         ExportOp cmd = command(ExportOp.class)//
                 .setFeatureStore(featureStore)//
                 .setPath(treeSpec)//
+                .exportDefaultFeatureType()
                 .setTransactional(true)//
                 .setBBoxFilter(this.bboxFilter);//
 

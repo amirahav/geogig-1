@@ -47,6 +47,8 @@ public interface CommandContext {
      * @param responseContent the command response
      */
     void setResponseContent(StreamResponse responseContent);
+    
+    void setResponseContent(ByteResponse responseContent);
 
     void setResponse(Function<MediaType, Representation> representation);
 

@@ -18,8 +18,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
-import org.locationtech.geogig.api.ObjectId;
-import org.locationtech.geogig.api.Platform;
+import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.repository.Platform;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.GraphDatabase;

@@ -13,8 +13,8 @@ import static org.locationtech.geogig.test.integration.sqlite.XerialTests.inject
 
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
-import org.locationtech.geogig.api.Context;
-import org.locationtech.geogig.api.TestPlatform;
+import org.locationtech.geogig.repository.Context;
+import org.locationtech.geogig.test.TestPlatform;
 import org.locationtech.geogig.test.integration.LogOpTest;
 
 

@@ -23,14 +23,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import org.locationtech.geogig.api.ObjectId;
-import org.locationtech.geogig.api.Platform;
-import org.locationtech.geogig.api.RevCommit;
-import org.locationtech.geogig.api.RevFeature;
-import org.locationtech.geogig.api.RevFeatureType;
-import org.locationtech.geogig.api.RevObject;
-import org.locationtech.geogig.api.RevTag;
-import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.repository.Platform;
+import org.locationtech.geogig.model.RevCommit;
+import org.locationtech.geogig.model.RevFeature;
+import org.locationtech.geogig.model.RevFeatureType;
+import org.locationtech.geogig.model.RevObject;
+import org.locationtech.geogig.model.RevTag;
+import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ConfigDatabase;
@@ -126,7 +126,7 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
         T obj = getIfPresent(id, type);
         if (obj == null) {
             throw new NoSuchElementException("No object with ids: " + id);
-        }
+        }api
 
         return obj;
     }

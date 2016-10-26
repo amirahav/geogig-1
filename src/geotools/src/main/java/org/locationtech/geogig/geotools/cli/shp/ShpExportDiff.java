@@ -66,6 +66,9 @@ public class ShpExportDiff extends AbstractShpCommand implements CLICommand {
     @Parameter(names = {
             "--old" }, description = "Export features from the old version instead of the most recent one")
     public boolean old;
+    
+    @Parameter(names = { "--nochangetype", "-n" }, description = "Exclude changetype column from the output shapefile")
+    public boolean nochangetype;
 
     /**
      * Charset to use for encoding attributes in DBF file
@@ -116,7 +119,8 @@ public class ShpExportDiff extends AbstractShpCommand implements CLICommand {
         }
 
         SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
-        builder.add(ExportDiffOp.CHANGE_TYPE_NAME, String.class);
+        if (!nochangetype)
+            builder.add(ExportDiffOp.CHANGE_TYPE_NAME, String.class);
         for (AttributeDescriptor descriptor : outputFeatureType.getAttributeDescriptors()) {
             builder.add(descriptor);
         }
@@ -138,6 +142,7 @@ public class ShpExportDiff extends AbstractShpCommand implements CLICommand {
 
         ExportDiffOp op = cli.getGeogig().command(ExportDiffOp.class).setFeatureStore(featureStore)
                 .setPath(path).setOldRef(commitOld).setNewRef(commitNew).setUseOld(old)
+                .setUseNochangetype(nochangetype)
                 .setTransactional(false).setFeatureTypeConversionFunction(function);
         try {
             op.setProgressListener(cli.getProgressListener()).call();
