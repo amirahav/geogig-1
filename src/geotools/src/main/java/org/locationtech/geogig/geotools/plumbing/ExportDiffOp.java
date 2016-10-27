@@ -163,7 +163,7 @@ public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
     		featureType = addChangeTypeAttribute(
     				database.getFeatureType(metadataId));
     	else
-    		featureType = (SimpleFeatureType)database.getFeatureType(metadataId);
+    		featureType = (SimpleFeatureType) database.getFeatureType(metadataId).type();
         final RevFeatureType revFeatureType = RevFeatureTypeBuilder.build(featureType);
         final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(featureType);
 
