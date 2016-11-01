@@ -62,6 +62,7 @@ import org.locationtech.geogig.repository.DiffEntry;
 import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
+import org.locationtech.geogig.web.api.ByteResponse;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.CommandResponse;
 import org.locationtech.geogig.web.api.CommandSpecException;
@@ -374,13 +375,23 @@ public class Log extends AbstractWebAPICommand {
             });
         } else if (summary) {
             if (paths != null && paths.size() > 0) {
-                context.setResponseContent(new StreamResponse() {
+            	if (!zip) {
+	                context.setResponseContent(new StreamResponse() {
+	
+	                    @Override
+	                    public void write(Writer out) throws Exception {
+	                        writeCSV(context.getRepository(), out, log);
+	                    }
+	                });
+            	}else{
+            		context.setResponseContent(new ByteResponse() {
 
-                    @Override
-                    public void write(Writer out) throws Exception {
-                        writeCSV(context.getRepository(), out, log);
-                    }
-                });
+                        @Override
+                        public void write(OutputStream out) throws Exception {
+                            writeZIP(context.getRepository(), out, log);
+                        }
+                    });
+            	}
             } else {
                 throw new CommandSpecException(
                         "You must specify a feature type path when getting a summary.");
