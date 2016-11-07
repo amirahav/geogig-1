@@ -75,8 +75,43 @@ public class DiffEntry {
     private final NodeRef oldObject;
 
     private final NodeRef newObject;
+    
+    private Optional<String> commitAuthorEmail;
+    
+    private Optional<String> commitAuthorName;
+    
+    private String commitTime;
+    
+    
 
-    /**
+    
+	public Optional<String> getCommitAuthorEmail() {
+		return commitAuthorEmail;
+	}
+
+	public void setCommitAuthorEmail(Optional<String> commitAuthorEmail) {
+		this.commitAuthorEmail = commitAuthorEmail;
+	}
+
+	public Optional<String> getCommitAuthorName() {
+		return commitAuthorName;
+	}
+
+	public void setCommitAuthorName(Optional<String> commitAuthorName) {
+		this.commitAuthorName = commitAuthorName;
+	}
+
+
+
+	public String getCommitTime() {
+		return commitTime;
+	}
+
+	public void setCommitTime(String commitTime) {
+		this.commitTime = commitTime;
+	}
+
+	/**
      * Constructs a new {@code DiffEntry} from two different {@link Node}s
      * 
      * @param oldObject the old node ref

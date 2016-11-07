@@ -576,6 +576,9 @@ public class Log extends AbstractWebAPICommand {
                 SimpleFeatureType outputFeatureType = (SimpleFeatureType) featureType.type();
                 SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
                 builder.add(ExportDiffOp.CHANGE_TYPE_NAME, String.class);
+                builder.add(ExportDiffOp.CHANGE_AUTHOR_EMAIL, String.class);
+                builder.add(ExportDiffOp.CHANGE_AUTHOR_NAME, String.class);
+                builder.add(ExportDiffOp.CHANGE_AUTHOR_TIME, String.class);
                 for (AttributeDescriptor descriptor : outputFeatureType.getAttributeDescriptors()) {
                     builder.add(descriptor);
                 }

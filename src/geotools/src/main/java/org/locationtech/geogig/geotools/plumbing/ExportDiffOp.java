@@ -60,7 +60,10 @@ import com.google.common.collect.Iterators;
 
 public class ExportDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
 
-    public static final String CHANGE_TYPE_NAME = "changetype";
+    public static final String CHANGE_TYPE_NAME = "changetype";  
+    public static final String CHANGE_AUTHOR_EMAIL = "email";
+    public static final String CHANGE_AUTHOR_NAME = "authorname";
+    public static final String CHANGE_AUTHOR_TIME = "changetime";
 
     private static final Function<Feature, Optional<Feature>> IDENTITY = (feature) -> Optional
             .fromNullable(feature);

@@ -13,6 +13,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -66,6 +67,9 @@ import com.google.common.collect.UnmodifiableIterator;
 public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
 
     public static final String CHANGE_TYPE_NAME = "changetype";
+    public static final String CHANGE_AUTHOR_EMAIL = "email";
+    public static final String CHANGE_AUTHOR_NAME = "authorname";
+    public static final String CHANGE_AUTHOR_TIME = "changetime";
 
     private static final Function<Feature, Optional<Feature>> IDENTITY = new Function<Feature, Optional<Feature>>() {
 
@@ -190,6 +194,9 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                     featureBuilder.set(name, value);
                 }
                 featureBuilder.set(CHANGE_TYPE_NAME, input.changeType().name().charAt(0));
+                featureBuilder.set(CHANGE_AUTHOR_EMAIL, input.getCommitAuthorEmail().orNull());
+                featureBuilder.set(CHANGE_AUTHOR_NAME, input.getCommitAuthorName().orNull());
+                featureBuilder.set(CHANGE_AUTHOR_TIME, input.getCommitTime());
                 Feature feature = featureBuilder.buildFeature(nodeRef.name());
                 feature.getUserData().put(Hints.USE_PROVIDED_FID, true);
                 feature.getUserData().put(RevFeature.class, revFeature);
@@ -228,7 +235,11 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
             Iterator<DiffEntry> diffs = command(DiffOp.class).setOldVersion(parentId)
                     .setNewVersion(commit.getId().toString()).setFilter(path).call();
             while (diffs.hasNext()) {
-                diffentries.add(diffs.next());
+            	DiffEntry diff = diffs.next();
+            	diff.setCommitAuthorEmail(commit.getAuthor().getEmail());
+            	diff.setCommitAuthorName(commit.getAuthor().getName());
+            	diff.setCommitTime(new Date(commit.getAuthor().getTimestamp()).toString());
+                diffentries.add(diff);
             }
         }
 
@@ -240,6 +251,9 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
         SimpleFeatureType featureType = (SimpleFeatureType) revFType.type();
         SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
         builder.add(CHANGE_TYPE_NAME, String.class);
+        builder.add(CHANGE_AUTHOR_EMAIL, String.class);
+        builder.add(CHANGE_AUTHOR_NAME, String.class);
+        builder.add(CHANGE_AUTHOR_TIME, String.class);
         for (AttributeDescriptor descriptor : featureType.getAttributeDescriptors()) {
             builder.add(descriptor);
         }
