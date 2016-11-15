@@ -189,7 +189,7 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 final RevFeature revFeature = database.getFeature(nodeRef.getObjectId());
                 ImmutableList<Optional<Object>> values = revFeature.getValues();
                 for (int i = 0; i < values.size(); i++) {
-                    String name = featureType.getDescriptor(i + 1).getLocalName();
+                    String name = featureType.getDescriptor(i + 4).getLocalName();
                     Object value = values.get(i).orNull();
                     featureBuilder.set(name, value);
                 }
