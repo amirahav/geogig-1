@@ -19,11 +19,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.Map;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.ObjectId;
@@ -51,6 +49,7 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 
 public class RocksdbObjectStore extends AbstractObjectStore implements ObjectStore {
@@ -223,41 +222,67 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         @Override
         public Iterator<RevObject> apply(List<ObjectId> input) {
             store.checkOpen();
-            SortedSet<ObjectId> sortedIds = new TreeSet<>(input);
-            List<RevObject> objects = new ArrayList<>(input.size());
+
             try (ReadOptions ops = new ReadOptions()) {
                 ops.setFillCache(false);// better for bulk ops
                 ops.setVerifyChecksums(false);
+                List<byte[]> keys = Lists.transform(input, (id) -> id.getRawValue());
 
-                byte[] keybuff = new byte[ObjectId.NUM_BYTES];
+                Map<byte[], byte[]> map = store.db.multiGet(ops, keys);
 
-                try (RocksIterator rocksit = store.db.newIterator(ops)) {
-                    for (ObjectId id : sortedIds) {
-                        RevObject object = null;
-                        id.getRawValue(keybuff);
-                        rocksit.seek(keybuff);
-                        if (rocksit.isValid()) {
-                            byte[] currentKey = rocksit.key();
-                            if (Arrays.equals(keybuff, currentKey)) {
-                                byte[] value = rocksit.value();
-                                try {
-                                    object = store.serializer.read(id,
-                                            new ByteArrayInputStream(value));
-                                    if (filter.apply(object)) {
-                                        objects.add(object);
-                                        listener.found(id, Integer.valueOf(value.length));
-                                        continue;
-                                    }
-                                } catch (IOException e) {
-                                    throw Throwables.propagate(e);
-                                }
-                            }
-                        }
-                        listener.notFound(id);
+                return Iterators.transform(map.entrySet().iterator(), (en) -> {
+                    ObjectId id = ObjectId.createNoClone(en.getKey());
+                    RevObject ob;
+                    try {
+                        byte[] value = en.getValue();
+                        ob = store.serializer.read(id, new ByteArrayInputStream(value));
+                    } catch (IOException e) {
+                        throw Throwables.propagate(e);
                     }
-                }
+                    return ob;
+                });
+
+            } catch (RocksDBException e) {
+                throw Throwables.propagate(e);
             }
-            return objects.iterator();
+
+
+            // store.checkOpen();
+            // SortedSet<ObjectId> sortedIds = new TreeSet<>(input);
+            // List<RevObject> objects = new ArrayList<>(input.size());
+            // try (ReadOptions ops = new ReadOptions()) {
+            // ops.setFillCache(false);// better for bulk ops
+            // ops.setVerifyChecksums(false);
+            //
+            // byte[] keybuff = new byte[ObjectId.NUM_BYTES];
+            //
+            // try (RocksIterator rocksit = store.db.newIterator(ops)) {
+            // for (ObjectId id : sortedIds) {
+            // RevObject object = null;
+            // id.getRawValue(keybuff);
+            // rocksit.seek(keybuff);
+            // if (rocksit.isValid()) {
+            // byte[] currentKey = rocksit.key();
+            // if (Arrays.equals(keybuff, currentKey)) {
+            // byte[] value = rocksit.value();
+            // try {
+            // object = store.serializer.read(id,
+            // new ByteArrayInputStream(value));
+            // if (filter.apply(object)) {
+            // objects.add(object);
+            // listener.found(id, Integer.valueOf(value.length));
+            // continue;
+            // }
+            // } catch (IOException e) {
+            // throw Throwables.propagate(e);
+            // }
+            // }
+            // }
+            // listener.notFound(id);
+            // }
+            // }
+            // }
+            // return objects.iterator();
         }
     }
 
@@ -270,7 +295,7 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         checkNotNull(type, "type is null");
         checkOpen();
 
-        final int partitionSize = 500;
+        final int partitionSize = 50;
         Iterator<List<ObjectId>> partitions = Iterables.partition(ids, partitionSize).iterator();
 
         Iterator<Iterator<RevObject>> objects = Iterators.transform(partitions,

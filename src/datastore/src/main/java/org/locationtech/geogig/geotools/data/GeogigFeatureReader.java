@@ -70,6 +70,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
 import com.vividsolutions.jts.geom.Envelope;
 
 /**
@@ -171,6 +172,12 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature>
         diffOp.setChangeTypeFilter(changeType(changeType));
 
         sourceIterator = diffOp.call();
+        //////////
+//        Stopwatch sw = Stopwatch.createStarted();
+//        ArrayList<DiffEntry> entries = Lists.newArrayList(sourceIterator);
+//        System.err.printf("loaded all refs in %s\n", sw.stop());
+//        sourceIterator = AutoCloseableIterator.fromIterator(entries.iterator());
+        ////////////
         Iterator<NodeRef> featureRefs = toFeatureRefs(sourceIterator, changeType);
 
         final boolean filterSupportedByRefs = Filter.INCLUDE.equals(filter)
@@ -184,7 +191,7 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature>
 
         final Function<List<NodeRef>, Iterator<SimpleFeature>> function;
         function = new FetchFunction(context.objectDatabase(), schema);
-        final int fetchSize = 1000;
+        final int fetchSize = 100_000;
         Iterator<List<NodeRef>> partition = Iterators.partition(featureRefs, fetchSize);
         Iterator<Iterator<SimpleFeature>> transformed = Iterators.transform(partition, function);
 
@@ -260,8 +267,8 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature>
         if (screenMapFilter != null) {
             ScreenMapFilter.Stats stats = screenMapFilter.stats();
             Stopwatch stopwatch = stats.sw.stop();
-            // System.err.printf("GeoGigFeatureReader.close(): ScreenMap filtering: %s, time: %s\n",
-            // screenMapFilter.stats(), stopwatch);
+            System.err.printf("GeoGigFeatureReader.close(): ScreenMap filtering: %s, time: %s\n",
+                    screenMapFilter.stats(), stopwatch);
             LOGGER.debug("GeoGigFeatureReader.close(): ScreenMap filtering: {}, time: {}",
                     screenMapFilter.stats(), stopwatch);
         }
@@ -359,7 +366,15 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature>
                 fidIndex.put(ref.getObjectId(), ref.name());
             }
             Iterable<ObjectId> ids = fidIndex.keySet();
-            Iterator<RevFeature> all = source.getAll(ids, NOOP_LISTENER, RevFeature.class);
+            Iterator<RevFeature> all;
+
+            ///////////////
+            // Stopwatch sw = Stopwatch.createStarted();
+            // all = Lists.newArrayList(source.getAll(ids, NOOP_LISTENER,
+            // RevFeature.class)).iterator();
+            // System.err.printf("\tLoaded %,d RevFeatures in %s\n", fidIndex.size(), sw.stop());
+            ////////////////
+            all = source.getAll(ids, NOOP_LISTENER, RevFeature.class);
 
             AsFeature asFeature = new AsFeature(featureBuilder, fidIndex);
             Iterator<SimpleFeature> features = Iterators.transform(all, asFeature);
