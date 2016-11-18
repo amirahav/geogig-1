@@ -188,7 +188,7 @@ class ObjectDatabaseCacheInterceptor {
     private static class CacheHelper {
         private Provider<? extends CacheFactory> cacheProvider;
 
-        final boolean cacheFeatures = true;// TODO make configurable?
+        final boolean cacheFeatures = false;// TODO make configurable?
 
         public CacheHelper(final Provider<? extends CacheFactory> cacheProvider) {
             this.cacheProvider = cacheProvider;
