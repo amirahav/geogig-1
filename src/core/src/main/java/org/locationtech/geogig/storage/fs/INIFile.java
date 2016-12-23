@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -12,7 +12,7 @@ package org.locationtech.geogig.storage.fs;
 import java.io.File;
 import java.io.IOException;
 
-import org.locationtech.geogig.storage.INIBlob;
+import org.locationtech.geogig.storage.impl.INIBlob;
 
 import com.google.common.io.Files;
 

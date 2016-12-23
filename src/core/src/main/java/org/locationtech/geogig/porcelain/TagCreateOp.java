@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -15,9 +15,9 @@ import static com.google.common.base.Preconditions.checkState;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevPerson;
-import org.locationtech.geogig.model.RevPersonBuilder;
 import org.locationtech.geogig.model.RevTag;
-import org.locationtech.geogig.model.RevTagBuilder;
+import org.locationtech.geogig.model.impl.RevPersonBuilder;
+import org.locationtech.geogig.model.impl.RevTagBuilder;
 import org.locationtech.geogig.plumbing.CheckRefFormat;
 import org.locationtech.geogig.plumbing.HashObject;
 import org.locationtech.geogig.plumbing.RefParse;

@@ -24,7 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.locationtech.geogig.repository.Repository;
-import org.locationtech.geogig.repository.RepositoryBusyException;
+import org.locationtech.geogig.repository.impl.RepositoryBusyException;
 import org.locationtech.geogig.rest.RestletException;
 import org.locationtech.geogig.web.api.ByteResponse;
 import org.locationtech.geogig.web.api.ByteWriterRepresentation;
@@ -168,12 +168,11 @@ public class CommandResource extends Resource {
     protected Optional<Repository> geogig = null;
 
     protected Representation runCommand(Variant variant, Request request) {
-        geogig = getGeogig(request);
-        Preconditions.checkState(geogig.isPresent());
-
         Representation rep;
         MediaType format = resolveFormat(options, variant);
         try {
+            geogig = getGeogig(request);
+            Preconditions.checkState(geogig.isPresent());
             RestletContext ctx = new RestletContext(geogig.get(), request);
             command.run(ctx);
             rep = ctx.getRepresentation(format, getJSONPCallback());

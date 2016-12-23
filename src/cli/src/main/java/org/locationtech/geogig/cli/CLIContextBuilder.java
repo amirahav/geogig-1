@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -16,8 +16,8 @@ import org.locationtech.geogig.di.HintsModule;
 import org.locationtech.geogig.di.PluginsModule;
 import org.locationtech.geogig.di.caching.CachingModule;
 import org.locationtech.geogig.repository.Context;
-import org.locationtech.geogig.repository.ContextBuilder;
 import org.locationtech.geogig.repository.Hints;
+import org.locationtech.geogig.repository.impl.ContextBuilder;
 import org.locationtech.geogig.rocksdb.RocksdbStorageProvider;
 import org.locationtech.geogig.storage.GraphDatabase;
 import org.locationtech.geogig.storage.ObjectDatabase;

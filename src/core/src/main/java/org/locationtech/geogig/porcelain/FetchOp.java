@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014 Boundless and others.
+/* Copyright (c) 2012-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -219,7 +219,7 @@ public class FetchOp extends AbstractGeoGigOp<TransferSummary> {
                     }
                 }
                 for (Ref localRef : localRemoteRefs) {
-                    if (!locals.contains(localRef)) {
+                    if (!(localRef instanceof SymRef) && !locals.contains(localRef)) {
                         // Delete the ref
                         ChangedRef changedRef = new ChangedRef(localRef, null,
                                 ChangeTypes.REMOVED_REF);

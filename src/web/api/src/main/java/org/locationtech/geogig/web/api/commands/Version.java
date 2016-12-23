@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -15,8 +15,10 @@ import org.locationtech.geogig.repository.Context;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.CommandResponse;
+import org.locationtech.geogig.web.api.CommandSpecException;
 import org.locationtech.geogig.web.api.ParameterSet;
 import org.locationtech.geogig.web.api.ResponseWriter;
+import org.restlet.data.Status;
 
 /**
  * Interface for the Version operation in the GeoGig.
@@ -46,11 +48,16 @@ public class Version extends AbstractWebAPICommand {
 
         final VersionInfo info = geogig.command(VersionOp.class).call();
 
+        if (info == null) {
+            throw new CommandSpecException("No version information available.",
+                    Status.SERVER_ERROR_SERVICE_UNAVAILABLE);
+        }
+
         context.setResponseContent(new CommandResponse() {
             @Override
             public void write(ResponseWriter out) throws Exception {
                 out.start();
-                out.writeElement("ProjectVersion", info.getProjectVersion());
+                out.writeStringElement("ProjectVersion", info.getProjectVersion());
                 out.writeElement("BuildTime", info.getBuildTime());
                 out.writeElement("BuildUserName", info.getBuildUserName());
                 out.writeElement("BuildUserEmail", info.getBuildUserEmail());

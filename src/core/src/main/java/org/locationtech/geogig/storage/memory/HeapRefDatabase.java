@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013 Boundless and others.
+/* Copyright (c) 2012-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import org.locationtech.geogig.model.ObjectId;
-import org.locationtech.geogig.storage.AbstractRefDatabase;
+import org.locationtech.geogig.storage.impl.AbstractRefDatabase;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;

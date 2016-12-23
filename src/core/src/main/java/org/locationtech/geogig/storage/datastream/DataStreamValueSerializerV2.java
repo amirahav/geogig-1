@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -36,6 +36,8 @@ import com.google.common.base.Splitter;
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteStreams;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.impl.PackedCoordinateSequenceFactory;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
 import com.vividsolutions.jts.io.WKBWriter;
@@ -144,7 +146,7 @@ public class DataStreamValueSerializerV2 {
                 data.writeDouble((Double) field);
             }
         });
-        serializers.put(FieldType.STRING, new ValueSerializer() {
+        final ValueSerializer stringSerializer = new ValueSerializer() {
             @Override
             public Object read(DataInput in) throws IOException {
                 final int multiStringMarkerOrsingleLength;
@@ -194,7 +196,8 @@ public class DataStreamValueSerializerV2 {
                     data.writeUTF(value);
                 }
             }
-        });
+        };
+        serializers.put(FieldType.STRING, stringSerializer);
         serializers.put(FieldType.BOOLEAN_ARRAY, new ValueSerializer() {
             @Override
             public Object read(DataInput in) throws IOException {
@@ -357,7 +360,7 @@ public class DataStreamValueSerializerV2 {
                 final int len = readUnsignedVarInt(in);
                 String[] strings = new String[len];
                 for (int i = 0; i < len; i++) {
-                    strings[i] = in.readUTF();
+                    strings[i] = (String) stringSerializer.read(in);
                 }
                 return strings;
             }
@@ -366,14 +369,17 @@ public class DataStreamValueSerializerV2 {
             public void write(Object field, DataOutput data) throws IOException {
                 writeUnsignedVarInt(((String[]) field).length, data);
                 for (String s : (String[]) field)
-                    data.writeUTF(s);
+                    stringSerializer.write(s, data);
             }
         });
         ValueSerializer geometry = new ValueSerializer() {
+            final GeometryFactory GEOM_FACT = new GeometryFactory(
+                    new PackedCoordinateSequenceFactory());
+
             @Override
             public Object read(DataInput in) throws IOException {
                 byte[] bytes = (byte[]) byteArray.read(in);
-                WKBReader wkbReader = new WKBReader();
+                WKBReader wkbReader = new WKBReader(GEOM_FACT);
                 try {
                     return wkbReader.read(bytes);
                 } catch (ParseException e) {

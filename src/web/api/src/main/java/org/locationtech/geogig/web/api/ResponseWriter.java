@@ -19,6 +19,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.xml.stream.XMLStreamWriter;
+
 import org.eclipse.jdt.annotation.Nullable;
 import org.geotools.metadata.iso.citation.Citations;
 import org.geotools.referencing.CRS;
@@ -180,6 +182,20 @@ public class ResponseWriter {
     }
 
     /**
+     * Writes the given element to the stream as a String. This method is deprecated and should be removed when all
+     * calls to {@link ResponseWriter#writeElement(java.lang.String, java.lang.String) } are fixed so that Numeric
+     * values are written correctly and String values are not interpreted as Numeric, even if they can be parsed as
+     * numeric.
+     *
+     * @param element the element name
+     * @param content the element content
+     * @throws StreamWriterException
+     */
+    @Deprecated
+    public void writeStringElement(String element, @Nullable String content) throws StreamWriterException {
+        out.writeStringElement(element, out);
+    }
+    /**
      * Writes staged changes to the stream.
      * 
      * @param setFilter the configured {@link DiffIndex} command
@@ -320,7 +336,7 @@ public class ResponseWriter {
         writeCommitImpl(commit, tag, adds, modifies, removes);
         if (isListCommit) {
             // in a list, write to an array
-            out.writeEndArray();
+            out.writeEndArrayElement();
         } else {
             out.writeEndElement();
         }
@@ -528,24 +544,8 @@ public class ResponseWriter {
      * @param diff the changes returned from the command
      * @throws StreamWriterException
      */
-    public void writeCommitResponse(RevCommit commit, Iterator<DiffEntry> diff)
+    public void writeCommitResponse(RevCommit commit, int adds, int deletes, int changes)
             throws StreamWriterException {
-        int adds = 0, deletes = 0, changes = 0;
-        DiffEntry diffEntry;
-        while (diff.hasNext()) {
-            diffEntry = diff.next();
-            switch (diffEntry.changeType()) {
-            case ADDED:
-                ++adds;
-                break;
-            case REMOVED:
-                ++deletes;
-                break;
-            case MODIFIED:
-                ++changes;
-                break;
-            }
-        }
         writeElement("commitId", commit.getId().toString());
         writeElement("added", Integer.toString(adds));
         writeElement("changed", Integer.toString(changes));

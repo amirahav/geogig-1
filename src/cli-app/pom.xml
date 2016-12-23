@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.locationtech.geogig</groupId>
     <artifactId>geogig</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
 
@@ -54,6 +54,11 @@
     </dependency>
     <dependency>
       <groupId>org.locationtech.geogig</groupId>
+      <artifactId>geogig-rocksdb</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.locationtech.geogig</groupId>
       <artifactId>geogig-postgres</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -71,6 +76,11 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-all</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.locationtech.geogig</groupId>
@@ -108,7 +118,7 @@
           </platforms>
           <programs>
             <program>
-              <mainClass>org.locationtech.geogig.cli.CLI</mainClass>
+              <mainClass>org.locationtech.geogig.cli.app.CLI</mainClass>
               <name>geogig</name>
             </program>
             <!--program>
@@ -116,7 +126,7 @@
               <name>geogig-console</name>
             </program-->
             <program>
-              <mainClass>org.locationtech.geogig.cli.GeogigPy4JEntryPoint</mainClass>
+              <mainClass>org.locationtech.geogig.cli.app.GeogigPy4JEntryPoint</mainClass>
               <name>geogig-gateway</name>
             </program>
           </programs>
@@ -133,9 +143,10 @@
         <plugin>
             <artifactId>maven-assembly-plugin</artifactId>
             <configuration>
+                <finalName>geogig</finalName>
                 <archive>
                     <manifest>
-                        <mainClass>org.locationtech.geogig.cli.CLI</mainClass>
+                        <mainClass>org.locationtech.geogig.cli.app.CLI</mainClass>
                     </manifest>
                 </archive>
                 <descriptors>
@@ -150,7 +161,7 @@
                         <finalName>geogig</finalName>
                         <archive>
                             <manifest>
-                                <mainClass>org.locationtech.geogig.cli.CLI</mainClass>
+                                <mainClass>org.locationtech.geogig.cli.app.CLI</mainClass>
                             </manifest>
                         </archive>
                         <descriptors>
@@ -164,6 +175,7 @@
                 </execution>
                 <execution>
                     <id>assemble-zip</id>
+                    <phase>package</phase>
                     <goals>
                         <goal>single</goal>
                     </goals>
@@ -211,7 +223,7 @@
           </dependency>
           <dependency>
             <groupId>org.locationtech.geogig</groupId>
-            <artifactId>geogig-rocksdb</artifactId>
+            <artifactId>geogig-gui</artifactId>
             <version>${project.version}</version>
           </dependency>
       </dependencies>

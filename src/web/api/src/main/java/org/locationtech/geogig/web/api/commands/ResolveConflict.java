@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -18,8 +18,8 @@ import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevFeature;
 import org.locationtech.geogig.model.RevFeatureType;
 import org.locationtech.geogig.model.RevObject.TYPE;
+import org.locationtech.geogig.model.impl.RevTreeBuilder;
 import org.locationtech.geogig.model.RevTree;
-import org.locationtech.geogig.model.RevTreeBuilder;
 import org.locationtech.geogig.plumbing.FindTreeChild;
 import org.locationtech.geogig.plumbing.RevObjectParse;
 import org.locationtech.geogig.plumbing.UpdateTree;
@@ -82,6 +82,12 @@ public class ResolveConflict extends AbstractWebAPICommand {
     @Override
     protected void runInternal(CommandContext context) {
         final Context geogig = this.getRepositoryContext(context);
+        if (path == null) {
+            throw new CommandSpecException("No path was given.");
+        }
+        if (objectId == null) {
+            throw new CommandSpecException("No object ID was given.");
+        }
 
         RevTree revTree = geogig.workingTree().getTree();
 
@@ -93,8 +99,14 @@ public class ResolveConflict extends AbstractWebAPICommand {
         RevFeatureType revFeatureType = geogig.command(RevObjectParse.class)
                 .setObjectId(nodeRef.get().getMetadataId()).call(RevFeatureType.class).get();
 
-        RevFeature revFeature = geogig.command(RevObjectParse.class).setObjectId(objectId)
-                .call(RevFeature.class).get();
+        Optional<RevFeature> object = geogig.command(RevObjectParse.class).setObjectId(objectId)
+                .call(RevFeature.class);
+        
+        if (!object.isPresent()) {
+            throw new CommandSpecException("Object ID could not be resolved to a feature.");
+        }
+        
+        RevFeature revFeature = object.get();
 
         CoordinateReferenceSystem crs = revFeatureType.type().getCoordinateReferenceSystem();
         Envelope bounds = ReferencedEnvelope.create(crs);

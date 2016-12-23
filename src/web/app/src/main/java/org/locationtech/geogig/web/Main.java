@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -15,21 +15,22 @@ import java.util.LinkedList;
 import java.util.Map;
 
 import org.locationtech.geogig.cli.CLIContextBuilder;
-import org.locationtech.geogig.model.DefaultPlatform;
+import org.locationtech.geogig.model.impl.DefaultPlatform;
 import org.locationtech.geogig.plumbing.ResolveGeogigURI;
 import org.locationtech.geogig.repository.Context;
-import org.locationtech.geogig.repository.GlobalContextBuilder;
 import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.Platform;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
+import org.locationtech.geogig.repository.impl.GlobalContextBuilder;
 import org.locationtech.geogig.rest.TaskResultDownloadResource;
 import org.locationtech.geogig.rest.TaskStatusResource;
 import org.locationtech.geogig.rest.postgis.PGRouter;
 import org.locationtech.geogig.rest.repository.CommandResource;
-import org.locationtech.geogig.rest.repository.DeleteRepository;
 import org.locationtech.geogig.rest.repository.FixedEncoder;
+import org.locationtech.geogig.rest.repository.InitCommandResource;
 import org.locationtech.geogig.rest.repository.RepositoryProvider;
+import org.locationtech.geogig.rest.repository.RepositoryResource;
 import org.locationtech.geogig.rest.repository.RepositoryRouter;
 import org.locationtech.geogig.rest.repository.SingleRepositoryProvider;
 import org.locationtech.geogig.rest.repository.UploadCommandResource;
@@ -128,13 +129,15 @@ public class Main extends Application {
                 singleRepoRouter);
         Router repo = new RepositoryRouter();
         Router postgis = new PGRouter();
-        singleRepoRouter.attach("", DeleteRepository.class);
+        singleRepoRouter.attach("", RepositoryResource.class);
         singleRepoRouter.attach("/postgis.{extension}", postgis);
         singleRepoRouter.attach("/postgis", postgis);
         singleRepoRouter.attach("/repo.{extension}", repo);
         singleRepoRouter.attach("/repo", repo);
         singleRepoRouter.attach("/import.{extension}", UploadCommandResource.class);
         singleRepoRouter.attach("/import", UploadCommandResource.class);
+        singleRepoRouter.attach("/init.{extension}", InitCommandResource.class);
+        singleRepoRouter.attach("/init", InitCommandResource.class);
         singleRepoRouter.attach("/{command}.{extension}", CommandResource.class);
         singleRepoRouter.attach("/{command}", CommandResource.class);
 

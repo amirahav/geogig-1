@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -13,7 +13,6 @@ import static org.locationtech.geogig.storage.datastream.FormatCommonV1.readObje
 
 import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -152,8 +151,9 @@ public final class BinaryPackedChanges {
                 serializer.write(object, out);
                 objectCount++;
             }
-            DataOutput dataOut = new DataOutputStream(out);
+            DataOutputStream dataOut = new DataOutputStream(out);
             FormatCommonV1.writeDiff(diff, dataOut);
+            dataOut.flush();
         }
         // signal the end of changes
         out.write(CHUNK_TYPE.FILTER_FLAG.value());

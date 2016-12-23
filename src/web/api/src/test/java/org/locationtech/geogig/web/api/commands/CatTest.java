@@ -21,12 +21,12 @@ import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.model.RevFeature;
-import org.locationtech.geogig.model.RevFeatureBuilder;
 import org.locationtech.geogig.model.RevFeatureType;
-import org.locationtech.geogig.model.RevObjectTestSupport;
 import org.locationtech.geogig.model.RevPerson;
 import org.locationtech.geogig.model.RevTag;
 import org.locationtech.geogig.model.RevTree;
+import org.locationtech.geogig.model.impl.RevFeatureBuilder;
+import org.locationtech.geogig.model.impl.RevObjectTestSupport;
 import org.locationtech.geogig.plumbing.ResolveFeatureType;
 import org.locationtech.geogig.porcelain.LogOp;
 import org.locationtech.geogig.porcelain.TagCreateOp;
@@ -60,7 +60,7 @@ public class CatTest extends AbstractWebOpTest {
         ParameterSet options = TestParams.of("objectid", id.toString());
 
         Cat op = (Cat) buildCommand(options);
-        assertEquals(id, op.object);
+        assertEquals(id.toString(), op.object);
     }
 
     @Test
@@ -68,7 +68,7 @@ public class CatTest extends AbstractWebOpTest {
         ParameterSet options = TestParams.of();
 
         ex.expect(IllegalArgumentException.class);
-        ex.expectMessage("You must specify a non-null ObjectId.");
+        ex.expectMessage("You must specify a valid non-null ObjectId.");
         buildCommand(options).run(testContext.get());
     }
 
@@ -77,7 +77,7 @@ public class CatTest extends AbstractWebOpTest {
         ParameterSet options = TestParams.of("objectid", ObjectId.NULL.toString());
 
         ex.expect(IllegalArgumentException.class);
-        ex.expectMessage("You must specify a non-null ObjectId.");
+        ex.expectMessage("You must specify a valid non-null ObjectId.");
         buildCommand(options).run(testContext.get());
     }
 

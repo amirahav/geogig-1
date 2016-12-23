@@ -1,9 +1,19 @@
+/* Copyright (c) 2016 Boundless and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Distribution License v1.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/org/documents/edl-v10.html
+ *
+ * Contributors:
+ * Johnathan Garrett - initial implementation
+ */
 package org.locationtech.geogig.web.api;
 
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.locationtech.geogig.model.RevObject;
 import org.locationtech.geogig.plumbing.merge.MergeScenarioConsumer;
 import org.locationtech.geogig.repository.Conflict;
 import org.locationtech.geogig.repository.DiffEntry;
@@ -86,7 +96,7 @@ public class PagedMergeScenarioConsumer extends MergeScenarioConsumer {
      */
     @Override
     public void unconflicted(DiffEntry diff) {
-        if (shouldKeep()) {
+        if (diff.newObjectType().equals(RevObject.TYPE.FEATURE) && shouldKeep()) {
             unconflicted.add(diff);
         }
     }

@@ -42,7 +42,7 @@ master_doc = 'index'
 # General information about the project.
 project = u'GeoGig'
 manual = u'User Manual'
-copyright = u'2013, OpenGeo'
+copyright = u'2016, OpenGeo'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -51,7 +51,7 @@ copyright = u'2013, OpenGeo'
 # The short X.Y version.
 version = '1.0'
 # The full version, including alpha/beta/rc tags.
-release = '1.0-SNAPSHOT'
+release = '1.0'
 
 # Users don't need to see the "SNAPSHOT" notation when it's there
 if release.find('SNAPSHOT') != -1:

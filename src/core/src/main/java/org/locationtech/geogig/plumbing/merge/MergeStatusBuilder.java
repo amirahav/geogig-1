@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014 Boundless and others.
+/* Copyright (c) 2012-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -31,10 +31,10 @@ import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.ProgressListener;
 import org.locationtech.geogig.repository.StagingArea;
 import org.locationtech.geogig.repository.WorkingTree;
-import org.locationtech.geogig.storage.PersistedIterable;
-import org.locationtech.geogig.storage.PersistedIterable.Serializer;
 import org.locationtech.geogig.storage.datastream.DataStreamSerializationFactoryV2;
 import org.locationtech.geogig.storage.datastream.FormatCommonV2;
+import org.locationtech.geogig.storage.impl.PersistedIterable;
+import org.locationtech.geogig.storage.impl.PersistedIterable.Serializer;
 
 import com.google.common.base.Optional;
 
@@ -315,11 +315,11 @@ public class MergeStatusBuilder extends MergeScenarioConsumer {
         }
 
         private void writeNode(DataOutputStream out, Node node) throws IOException {
-            FormatCommonV2.writeNode(node, out);
+            FormatCommonV2.INSTANCE.writeNode(node, out);
         }
 
         private Node readNode(DataInputStream in) throws IOException {
-            return FormatCommonV2.readNode(in);
+            return FormatCommonV2.INSTANCE.readNode(in);
         }
 
     }

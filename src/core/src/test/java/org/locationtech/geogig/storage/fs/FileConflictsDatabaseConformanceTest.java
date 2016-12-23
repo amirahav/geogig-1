@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Boundless.
+/* Copyright (c) 2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -13,7 +13,7 @@ import java.io.File;
 
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
-import org.locationtech.geogig.storage.ConflictsDatabaseConformanceTest;
+import org.locationtech.geogig.storage.impl.ConflictsDatabaseConformanceTest;
 
 public class FileConflictsDatabaseConformanceTest
         extends ConflictsDatabaseConformanceTest<FileConflictsDatabase> {

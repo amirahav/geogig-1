@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -12,12 +12,12 @@ package org.locationtech.geogig.web.api.commands;
 import static com.google.common.base.Preconditions.checkState;
 
 import org.eclipse.jdt.annotation.Nullable;
-import org.locationtech.geogig.model.CommitBuilder;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.model.RevTree;
-import org.locationtech.geogig.model.RevTreeBuilder;
+import org.locationtech.geogig.model.impl.CommitBuilder;
+import org.locationtech.geogig.model.impl.RevTreeBuilder;
 import org.locationtech.geogig.plumbing.FindCommonAncestor;
 import org.locationtech.geogig.plumbing.FindTreeChild;
 import org.locationtech.geogig.plumbing.RefParse;
@@ -147,6 +147,16 @@ public class RevertFeature extends AbstractWebAPICommand {
     @Override
     protected void runInternal(CommandContext context) {
         final Context geogig = this.getRepositoryContext(context);
+
+        if (featurePath == null) {
+            throw new CommandSpecException("No path was given.");
+        }
+        if (newCommitId == null) {
+            throw new CommandSpecException("No 'new' commit ID was given.");
+        }
+        if (oldCommitId == null) {
+            throw new CommandSpecException("No 'old' commit ID was given.");
+        }
 
         Optional<RevTree> newTree;
         Optional<RevTree> oldTree;

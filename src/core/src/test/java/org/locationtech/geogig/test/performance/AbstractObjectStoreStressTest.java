@@ -1,4 +1,4 @@
-/* Copyright (c) 2015 Boundless.
+/* Copyright (c) 2015-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -9,7 +9,7 @@
  */
 package org.locationtech.geogig.test.performance;
 
-import static org.locationtech.geogig.model.RevObjectTestSupport.featureForceId;
+import static org.locationtech.geogig.model.impl.RevObjectTestSupport.featureForceId;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,7 +40,7 @@ import org.junit.rules.TestName;
 import org.junit.runners.MethodSorters;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevObject;
-import org.locationtech.geogig.model.RevObjectTestSupport;
+import org.locationtech.geogig.model.impl.RevObjectTestSupport;
 import org.locationtech.geogig.repository.Platform;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.BulkOpListener.CountingListener;
@@ -51,10 +51,13 @@ import org.locationtech.geogig.test.TestPlatform;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Throwables;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.io.WKTReader;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public abstract class AbstractObjectStoreStressTest {
@@ -133,7 +136,7 @@ public abstract class AbstractObjectStoreStressTest {
         testPutAll(5000_000);
     }
 
-    @Ignore
+    // @Ignore
     @Test
     public void test06_PutAll_10M() throws Exception {
         testPutAll(10_000_000);
@@ -333,6 +336,8 @@ public abstract class AbstractObjectStoreStressTest {
         return fakeObject(objectId);
     }
 
+    private Geometry fakeGeom;
+
     private RevObject fakeObject(ObjectId forcedId) {
         // String oidString = objectId.toString();
         // ObjectId treeId = ObjectId.forString("tree" + oidString);
@@ -342,7 +347,16 @@ public abstract class AbstractObjectStoreStressTest {
         // String message = "message " + oidString;
         // return new RevCommitImpl(objectId, treeId, parentIds, author, committer, message);
 
-        return featureForceId(forcedId, "null", "Some string value " + forcedId);
+        if (fakeGeom == null) {
+            try {
+                fakeGeom = new WKTReader().read(
+                        "MULTIPOLYGON (((-121.3647138 38.049474, -121.3646902 38.049614, -121.3646159 38.0496058, -121.3646188 38.049587, -121.3645936 38.049586, -121.3645924 38.0496222, -121.3645056 38.0496178, -121.3645321 38.0494567, -121.3647138 38.049474)))");
+            } catch (Exception e) {
+                throw Throwables.propagate(e);
+            }
+        }
+
+        return featureForceId(forcedId, fakeGeom, "Some string value " + forcedId);
     }
 
     private ObjectId fakeId(int i) {

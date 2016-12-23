@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014 Boundless and others.
+/* Copyright (c) 2012-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -16,10 +16,10 @@ import java.net.URI;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.plumbing.CreateDeduplicator;
-import org.locationtech.geogig.repository.DeduplicationService;
 import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.Remote;
 import org.locationtech.geogig.repository.Repository;
+import org.locationtech.geogig.repository.impl.DeduplicationService;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;

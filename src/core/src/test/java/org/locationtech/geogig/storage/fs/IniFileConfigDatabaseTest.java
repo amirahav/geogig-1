@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -13,8 +13,8 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.locationtech.geogig.repository.Platform;
 import org.locationtech.geogig.storage.ConfigDatabase;
-import org.locationtech.geogig.storage.ConfigDatabaseTest;
 import org.locationtech.geogig.storage.ConfigException;
+import org.locationtech.geogig.storage.impl.ConfigDatabaseTest;
 
 public class IniFileConfigDatabaseTest extends ConfigDatabaseTest<IniFileConfigDatabase> {
 

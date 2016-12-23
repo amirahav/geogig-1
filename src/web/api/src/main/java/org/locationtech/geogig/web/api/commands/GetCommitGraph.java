@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -121,15 +121,14 @@ public class GetCommitGraph extends AbstractWebAPICommand {
             }
         }
 
-        final Iterator<RevCommit> historyIterator = history.iterator();
-        Iterators.advance(historyIterator, page * elementsPerPage);
-
         context.setResponseContent(new CommandResponse() {
 
             @Override
             public void write(ResponseWriter out) throws Exception {
+                final Iterator<RevCommit> historyIterator = history.iterator();
+                Iterators.advance(historyIterator, page * elementsPerPage);
                 out.start();
-                out.writeCommits(history.iterator(), elementsPerPage, false);
+                out.writeCommits(historyIterator, elementsPerPage, false);
                 out.finish();
             }
         });

@@ -5,7 +5,7 @@
 
   <groupId>org.locationtech.geogig</groupId>
   <artifactId>geogig</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0</version>
   <packaging>pom</packaging>
   <name>GeoGig</name>
 
@@ -54,6 +54,8 @@
     <license>
       <name>Eclipse Distribution License</name>
       <url>https://www.eclipse.org/org/documents/edl-v10.html</url>
+      <distribution>repo</distribution>
+      <comments>The Eclipse Distribution License (a BSD-3 style license)</comments>
     </license>
   </licenses>
   <repositories>
@@ -102,7 +104,7 @@
     <slf4j.version>1.7.5</slf4j.version>
     <sqljdbc4.version>3.0</sqljdbc4.version>
     <hikaricp.version>2.4.2</hikaricp.version>
-    <rocksdb.version>4.11.2</rocksdb.version>
+    <rocksdb.version>4.13.4</rocksdb.version>
     <springweb.version>4.2.5.RELEASE</springweb.version>
 
     <test.maxHeapSize>512M</test.maxHeapSize>
@@ -634,7 +636,60 @@
      <id>experimental</id>
      <modules>
        <module>../ql</module>
+       <module>../gui</module>
      </modules>
+    </profile>
+    <profile>
+      <id>locationtech</id>
+      <distributionManagement>
+        <repository>
+          <id>repo.locationtech.org</id>
+          <name>GeoGig Repository - Releases</name>
+          <url>https://repo.locationtech.org/content/repositories/geogig-releases/</url>
+        </repository>
+        <snapshotRepository>
+          <id>repo.locationtech.org</id>
+          <name>GeoGig Repository - Snapshots</name>
+          <url>https://repo.locationtech.org/content/repositories/geogig-snapshots/</url>
+        </snapshotRepository>
+      </distributionManagement>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>eclipse-cbi</id>
+          <name>Eclipse CBI</name>
+          <url>https://repo.eclipse.org/content/repositories/cbi-releases/</url>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.eclipse.cbi.maven.plugins</groupId>
+              <artifactId>eclipse-jarsigner-plugin</artifactId>
+              <version>1.1.3</version>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+        <plugins>
+          <plugin>
+            <groupId>org.eclipse.cbi.maven.plugins</groupId>
+            <artifactId>eclipse-jarsigner-plugin</artifactId>
+            <version>1.1.3</version>
+            <executions>
+              <execution>
+                <id>sign</id>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <phase>verify</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 

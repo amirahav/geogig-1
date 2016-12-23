@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016 Boundless.
+/* Copyright (c) 2015-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -26,7 +26,7 @@ import javax.sql.DataSource;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.locationtech.geogig.repository.RepositoryBusyException;
+import org.locationtech.geogig.repository.impl.RepositoryBusyException;
 import org.locationtech.geogig.storage.postgresql.Environment.ConnectionConfig;
 
 import com.google.common.base.Throwables;

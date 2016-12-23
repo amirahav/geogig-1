@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -103,7 +103,7 @@ public class LsTree extends AbstractWebAPICommand {
      */
     @Override
     protected void runInternal(CommandContext context) {
-        LsTreeOp.Strategy lsStrategy = LsTreeOp.Strategy.CHILDREN;
+        final LsTreeOp.Strategy lsStrategy;
         if (recursive) {
             if (includeTrees) {
                 lsStrategy = LsTreeOp.Strategy.DEPTHFIRST;
@@ -115,18 +115,19 @@ public class LsTree extends AbstractWebAPICommand {
         } else {
             if (onlyTrees) {
                 lsStrategy = LsTreeOp.Strategy.TREES_ONLY;
+            } else {
+                lsStrategy = LsTreeOp.Strategy.CHILDREN;
             }
         }
 
         final Context geogig = this.getRepositoryContext(context);
 
-        final Iterator<NodeRef> iter = geogig.command(LsTreeOp.class).setReference(ref)
-                .setStrategy(lsStrategy).call();
-
         context.setResponseContent(new CommandResponse() {
 
             @Override
             public void write(ResponseWriter out) throws Exception {
+                final Iterator<NodeRef> iter = geogig.command(LsTreeOp.class).setReference(ref)
+                        .setStrategy(lsStrategy).call();
                 out.start(true);
                 out.writeLsTreeResponse(iter, verbose);
                 out.finish();

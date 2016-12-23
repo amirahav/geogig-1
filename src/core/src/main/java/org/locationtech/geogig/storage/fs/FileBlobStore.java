@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014 Boundless and others.
+/* Copyright (c) 2012-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -23,7 +23,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 
 import org.locationtech.geogig.plumbing.ResolveGeogigURI;
 import org.locationtech.geogig.repository.Platform;
-import org.locationtech.geogig.storage.TransactionBlobStore;
+import org.locationtech.geogig.storage.impl.TransactionBlobStore;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;

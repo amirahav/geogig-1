@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014 Boundless and others.
+/* Copyright (c) 2013-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -124,24 +124,20 @@ public class Diff extends AbstractWebAPICommand {
 
         final Context geogig = this.getRepositoryContext(context);
 
-        final AutoCloseableIterator<DiffEntry> diff = geogig.command(DiffOp.class)
-                .setOldVersion(oldRefSpec).setNewVersion(newRefSpec).setFilter(pathFilter).call();
-
         context.setResponseContent(new CommandResponse() {
             @Override
             public void write(ResponseWriter out) throws Exception {
-                out.start();
-                if (showGeometryChanges) {
-                    out.writeGeometryChanges(geogig, diff, page, elementsPerPage);
-                } else {
-                    out.writeDiffEntries("diff", page * elementsPerPage, elementsPerPage, diff);
+                try (AutoCloseableIterator<DiffEntry> diff = geogig.command(DiffOp.class)
+                        .setOldVersion(oldRefSpec).setNewVersion(newRefSpec).setFilter(pathFilter)
+                        .setPreserveIterationOrder(true).call()) {
+                    out.start();
+                    if (showGeometryChanges) {
+                        out.writeGeometryChanges(geogig, diff, page, elementsPerPage);
+                    } else {
+                        out.writeDiffEntries("diff", page * elementsPerPage, elementsPerPage, diff);
+                    }
+                    out.finish();
                 }
-                out.finish();
-            }
-
-            @Override
-            public void close() {
-                diff.close();
             }
         });
     }

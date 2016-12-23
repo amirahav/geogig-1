@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016 Boundless.
+/* Copyright (c) 2015-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -69,6 +69,7 @@ import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.ConflictsDatabase;
 import org.locationtech.geogig.storage.ObjectDatabase;
 import org.locationtech.geogig.storage.StorageType;
+import org.locationtech.geogig.storage.datastream.SerializationFactoryProxy;
 import org.locationtech.geogig.storage.postgresql.Environment.ConnectionConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +78,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -86,6 +88,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -102,13 +105,13 @@ public class PGObjectDatabase implements ObjectDatabase {
 
     private static final int DEFAULT_PUT_ALL_PARTITION_SIZE = 10_000;
 
-    private static final int DEFAULT_GET_ALL_PARTITION_SIZE = 1000;
+    private static final int DEFAULT_GET_ALL_PARTITION_SIZE = 100;
 
     private final Environment config;
 
     private final ConfigDatabase configdb;
 
-    private static final PGRevObjectEncoder encoder = new PGRevObjectEncoder();
+    private static final SerializationFactoryProxy encoder = new SerializationFactoryProxy();
 
     private DataSource dataSource;
 
@@ -433,17 +436,18 @@ public class PGObjectDatabase implements ObjectDatabase {
         Iterator<T> stream = Collections.emptyIterator();
 
         if (!cached.isEmpty()) {
-            List<T> found = new ArrayList<>(cached.size());
-            cached.forEach((id, bytes) -> {
+
+            Map<ObjectId, T> cachedObjects = Maps.transformEntries(cached, (id, bytes) -> {
                 RevObject o = encoder.decode(id, bytes);
                 if (type.isAssignableFrom(o.getClass())) {
                     listener.found(id, Integer.valueOf(bytes.length));
-                    found.add(type.cast(o));
-                } else {
-                    listener.notFound(id);
+                    return type.cast(o);
                 }
+                listener.notFound(id);
+                return null;
             });
-            hits = found.iterator();
+
+            hits = Iterators.filter(cachedObjects.values().iterator(), Predicates.notNull());
         }
         if (queryIds.size() > cached.size()) {
             Set<ObjectId> misses = Sets.difference(queryIds, cached.keySet());
@@ -507,7 +511,7 @@ public class PGObjectDatabase implements ObjectDatabase {
 
             int concurrency = db.threadPoolSize;
             for (int j = 0; j < concurrency && ids.hasNext(); j++) {
-                List<ObjectId> idList = new ArrayList<>(getAllPartitionSize);
+                Set<ObjectId> idList = new HashSet<>();
                 for (int i = 0; i < getAllPartitionSize && ids.hasNext(); i++) {
                     idList.add(ids.next());
                 }
@@ -668,7 +672,7 @@ public class PGObjectDatabase implements ObjectDatabase {
         return obj;
     }
 
-    private Future<List<RevObject>> getAll(final List<ObjectId> ids, final DataSource ds,
+    private Future<List<RevObject>> getAll(final Set<ObjectId> ids, final DataSource ds,
             final BulkOpListener listener, final @Nullable TYPE type) {
         checkState(isOpen(), "Database is closed");
 
@@ -700,9 +704,9 @@ public class PGObjectDatabase implements ObjectDatabase {
         @Nullable
         private final TYPE type;
 
-        public GetAllOp(List<ObjectId> ids, BulkOpListener listener, PGObjectDatabase db,
+        public GetAllOp(Set<ObjectId> ids, BulkOpListener listener, PGObjectDatabase db,
                 @Nullable TYPE type) {
-            this.queryIds = new HashSet<>(ids);
+            this.queryIds = ids;
             this.callback = listener;
             this.db = db;
             this.type = type;

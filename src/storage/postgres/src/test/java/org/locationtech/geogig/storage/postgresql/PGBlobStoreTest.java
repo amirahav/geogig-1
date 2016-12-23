@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014 Boundless and others.
+/* Copyright (c) 2012-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -15,8 +15,8 @@ import javax.sql.DataSource;
 
 import org.junit.After;
 import org.junit.Rule;
-import org.locationtech.geogig.storage.TransactionBlobStore;
-import org.locationtech.geogig.storage.TransactionBlobStoreTest;
+import org.locationtech.geogig.storage.impl.TransactionBlobStore;
+import org.locationtech.geogig.storage.impl.TransactionBlobStoreTest;
 
 public class PGBlobStoreTest extends TransactionBlobStoreTest {
 

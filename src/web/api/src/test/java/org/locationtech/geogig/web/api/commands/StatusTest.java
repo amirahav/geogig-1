@@ -1,7 +1,7 @@
-/*
- * Copyright (c) 2016 Boundless and others. All rights reserved. This program and the accompanying
- * materials are made available under the terms of the Eclipse Distribution License v1.0 which
- * accompanies this distribution, and is available at
+/* Copyright (c) 2016 Boundless and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Distribution License v1.0
+ * which accompanies this distribution, and is available at
  * https://www.eclipse.org/org/documents/edl-v10.html
  *
  * Contributors: Johnathan Garrett (Prominent Edge) - initial implementation
@@ -18,7 +18,7 @@ import javax.json.JsonValue;
 import org.junit.Test;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevFeature;
-import org.locationtech.geogig.model.RevFeatureBuilder;
+import org.locationtech.geogig.model.impl.RevFeatureBuilder;
 import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
