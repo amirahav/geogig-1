@@ -7,9 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
-
 import org.geotools.data.DataStore;
 import org.geotools.data.shapefile.ShapefileDataStoreFactory;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
@@ -20,7 +17,8 @@ import org.locationtech.geogig.rest.AsyncContext.AsyncCommand;
 import org.locationtech.geogig.rest.CommandRepresentationFactory;
 import org.locationtech.geogig.rest.Variants;
 import org.locationtech.geogig.rest.geotools.Export;
-import org.locationtech.geogig.rest.repository.RESTUtils;
+import org.locationtech.geogig.rest.geotools.Export.OutputFormat;
+import org.locationtech.geogig.web.api.RESTUtils;
 import org.locationtech.geogig.web.api.CommandContext;
 import org.locationtech.geogig.web.api.ParameterSet;
 import org.restlet.data.MediaType;
@@ -28,6 +26,8 @@ import org.restlet.data.MediaType;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
+import org.locationtech.geogig.web.api.StreamWriterException;
+import org.locationtech.geogig.web.api.StreamingWriter;
 
 
 public class ZipExportOutputFormat extends Export.OutputFormat {
@@ -128,28 +128,28 @@ public class ZipExportOutputFormat extends Export.OutputFormat {
 
         @Override
         public AsyncCommandRepresentation<File> newRepresentation(AsyncCommand<File> cmd,
-                MediaType mediaType, String baseURL) {
+                MediaType mediaType, String baseURL, boolean cleanup) {
 
-            return new ZipExportRepresentation(mediaType, cmd, baseURL);
+            return new ZipExportRepresentation(mediaType, cmd, baseURL, cleanup);
         }
     }
 
     public static class ZipExportRepresentation extends AsyncCommandRepresentation<File> {
 
         public ZipExportRepresentation(MediaType mediaType, AsyncCommand<File> cmd,
-                String baseURL) {
-            super(mediaType, cmd, baseURL);
+                String baseURL, boolean cleanup) {
+            super(mediaType, cmd, baseURL, cleanup);
         }
 
         @Override
-        protected void writeResultBody(XMLStreamWriter w, File result) throws XMLStreamException {
+        protected void writeResultBody(StreamingWriter w, File result) throws StreamWriterException {
 
             final String link = "tasks/" + super.cmd.getTaskId() + "/download";
             encodeDownloadURL(w, link);
 
         }
 
-        private void encodeDownloadURL(XMLStreamWriter w, String link) throws XMLStreamException {
+        private void encodeDownloadURL(StreamingWriter w, String link) throws StreamWriterException {
 
             final MediaType format = getMediaType();
             final MediaType outputFormat = Variants.ZIP.getMediaType();
@@ -161,8 +161,6 @@ public class ZipExportOutputFormat extends Export.OutputFormat {
                 w.writeAttribute("href", RESTUtils.buildHref(baseURL, link, null));
                 w.writeAttribute("type", outputFormat.toString());
                 w.writeEndElement();
-            } else if (MediaType.APPLICATION_JSON.equals(format)) {
-                element(w, "href", RESTUtils.buildHref(baseURL, link, null));
             }
         }
     }

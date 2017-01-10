@@ -40,6 +40,8 @@ import org.locationtech.geogig.web.api.CommandSpecException;
 import org.locationtech.geogig.web.api.PagedMergeScenarioConsumer;
 import org.locationtech.geogig.web.api.ParameterSet;
 import org.locationtech.geogig.web.api.ResponseWriter;
+import org.locationtech.geogig.web.api.StreamWriterException;
+import org.locationtech.geogig.web.api.StreamingWriter;
 import org.restlet.data.MediaType;
 
 import com.google.common.base.Optional;
@@ -199,9 +201,9 @@ public class ZipShpImportContext implements DataStoreImportContextService {
 
             @Override
             public AsyncCommandRepresentation<RevCommit> newRepresentation(
-                    AsyncCommand<RevCommit> cmd, MediaType mediaType, String baseURL) {
+                    AsyncCommand<RevCommit> cmd, MediaType mediaType, String baseURL, boolean cleanup) {
 
-                return new ZipShpImportRepresentation(mediaType, cmd, baseURL);
+                return new ZipShpImportRepresentation(mediaType, cmd, baseURL, cleanup);
             }
         }
 
@@ -209,19 +211,19 @@ public class ZipShpImportContext implements DataStoreImportContextService {
                 AsyncCommandRepresentation<RevCommit> {
 
             public ZipShpImportRepresentation(MediaType mediaType,
-                    AsyncCommand<RevCommit> cmd, String baseURL) {
-                super(mediaType, cmd, baseURL);
+                    AsyncCommand<RevCommit> cmd, String baseURL, boolean cleanup) {
+                super(mediaType, cmd, baseURL, cleanup);
             }
 
             @Override
-            protected void writeResultBody(XMLStreamWriter w, RevCommit result)
-                    throws XMLStreamException {
-                ResponseWriter out = new ResponseWriter(w);
+            protected void writeResultBody(StreamingWriter w, RevCommit result)
+                    throws StreamWriterException {
+                ResponseWriter out = new ResponseWriter(w, getMediaType());
                 out.writeCommit(result, "commit", null, null, null);
             }
 
             @Override
-            protected void writeError(XMLStreamWriter w, Throwable cause) throws XMLStreamException {
+            protected void writeError(StreamingWriter w, Throwable cause) throws StreamWriterException {
                 if (cause instanceof MergeConflictsException) {
                     Context context = cmd.getContext();
                     MergeConflictsException m = (MergeConflictsException) cause;
@@ -231,7 +233,7 @@ public class ZipShpImportContext implements DataStoreImportContextService {
                             .setLeft(ours).setRight(theirs).call();
                     final MergeScenarioReport report = context.command(ReportMergeScenarioOp.class)
                             .setMergeIntoCommit(ours).setToMergeCommit(theirs).call();
-                    ResponseWriter out = new ResponseWriter(w);
+                    ResponseWriter out = new ResponseWriter(w, getMediaType());
                     Optional<RevCommit> mergeCommit = Optional.absent();
                     w.writeStartElement("result");
                     out.writeMergeResponse(mergeCommit, report, ours.getId(),
