@@ -33,6 +33,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,8 +42,12 @@ import org.junit.Assert;
 import org.locationtech.geogig.cli.ArgumentTokenizer;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
+import org.locationtech.geogig.model.RevFeatureType;
+import org.locationtech.geogig.model.RevObject;
 import org.locationtech.geogig.model.impl.RevFeatureTypeBuilder;
 import org.locationtech.geogig.plumbing.RefParse;
+import org.locationtech.geogig.plumbing.ResolveTreeish;
+import org.locationtech.geogig.plumbing.RevObjectParse;
 import org.locationtech.geogig.plumbing.UpdateRef;
 import org.locationtech.geogig.plumbing.diff.AttributeDiff;
 import org.locationtech.geogig.plumbing.diff.FeatureDiff;
@@ -53,7 +58,9 @@ import org.locationtech.geogig.porcelain.MergeConflictsException;
 import org.locationtech.geogig.porcelain.MergeOp;
 import org.locationtech.geogig.porcelain.TagCreateOp;
 import org.locationtech.geogig.repository.Hints;
+import org.locationtech.geogig.repository.IndexInfo;
 import org.locationtech.geogig.repository.NodeRef;
+import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.repository.RepositoryResolver;
 import org.locationtech.geogig.repository.WorkingTree;
 import org.locationtech.geogig.repository.impl.GeoGIG;
@@ -64,6 +71,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 
@@ -72,6 +80,7 @@ import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import cucumber.runtime.java.StepDefAnnotation;
+
 
 /**
  *
@@ -85,6 +94,8 @@ public class DefaultStepDefinitions {
     private CLIContextProvider contextProvider;
 
     private CLIContext localRepo;
+
+    private Map<String, String> variables = new HashMap<>();
 
     private String replaceKnownVariables(String s) throws IOException {
         if (s.contains("${currentdir}")) {
@@ -141,6 +152,12 @@ public class DefaultStepDefinitions {
                 contextProvider.getURIBuilder().getClass().getSimpleName());
         contextProvider.before();
         this.localRepo = contextProvider.getOrCreateRepositoryContext("localrepo");
+
+        RevFeatureType rft = RevFeatureTypeBuilder.build(TestFeatures.pointsType);
+        setVariable("@PointsTypeID", rft.getId().toString());
+
+        rft = RevFeatureTypeBuilder.build(TestFeatures.linesType);
+        setVariable("@LinesTypeID", rft.getId().toString());
     }
 
     @cucumber.api.java.After
@@ -161,6 +178,12 @@ public class DefaultStepDefinitions {
             }
         }
         return repoUri;
+    }
+
+    @Given("^the repository has a truncated graph database$")
+    public void the_repository_has_a_truncated_graph_database() throws Throwable {
+        Repository repository = localRepo.geogigCLI.getGeogig().getRepository();
+        repository.graphDatabase().truncate();
     }
 
     @Given("^I am in an empty directory$")
@@ -217,6 +240,23 @@ public class DefaultStepDefinitions {
         String actual = localRepo.stdOut.toString().replaceAll(LINE_SEPARATOR, "")
                 .replaceAll("\\\\", "/");
         assertFalse(actual, actual.contains(expected));
+    }
+
+    @Then("^the response should contain variable \"([^\"]*)\"$")
+    public void checkResponseTextContains(String substring) {
+        substring = replaceVariables(substring);
+        String actual = localRepo.stdOut.toString().replaceAll(LINE_SEPARATOR, "")
+                .replaceAll("\\\\", "/");
+        assertTrue("'" + actual + "' does not contain '" + substring + "'",
+                actual.contains(substring));
+    }
+
+    @Then("^the response should not contain variable \"([^\"]*)\"$")
+     public void checkResponseTextDoesNotContain(String substring) {
+        substring = replaceVariables(substring);
+        String actual = localRepo.stdOut.toString().replaceAll(LINE_SEPARATOR, "")
+                .replaceAll("\\\\", "/");
+        assertFalse(actual, actual.contains(substring));
     }
 
     @Then("^the response should contain ([^\"]*) lines$")
@@ -440,6 +480,13 @@ public class DefaultStepDefinitions {
 
     }
 
+    @Given("^the remote repository has changes")
+    public void the_remote_repository_has_changes() throws Throwable {
+        CLIContext remoteRepo = contextProvider.getOrCreateRepositoryContext("remoterepo");
+        remoteRepo.insertAndAdd(lines3);
+        remoteRepo.runCommand(true, "commit -m Commit10");
+    }
+
     @Given("^I have a repository$")
     public void I_have_a_repository() throws Throwable {
         I_have_an_unconfigured_repository();
@@ -479,6 +526,12 @@ public class DefaultStepDefinitions {
         } else {
             throw new Exception("Unknown Feature");
         }
+    }
+
+    @Given("^I have a local committer")
+    public void I_have_a_local_committer() throws Throwable {
+        localRepo.runCommand(true, "config", "--local", "user.name", "Jane Doe");
+        localRepo.runCommand(true, "config", "--local", "user.email", "JaneDoe@example.com");
     }
 
     @Given("^I have 6 unstaged features$")
@@ -560,6 +613,16 @@ public class DefaultStepDefinitions {
         localRepo.insert(points1_modified);
     }
 
+    @Given("I remove and add a feature")
+    public void I_remove_and_add_a_feature() throws Throwable {
+        localRepo.deleteAndAdd(points1);
+    }
+
+    @Given("I remove a feature")
+    public void I_remove_a_feature() throws Throwable {
+        localRepo.delete(points1);
+    }
+
     @Given("^I a featuretype is modified$")
     public void I_modify_a_feature_type() throws Throwable {
         localRepo.deleteAndReplaceFeatureType();
@@ -617,5 +680,113 @@ public class DefaultStepDefinitions {
         }
         assertTrue(dir.mkdirs());
         localRepo.platform.setWorkingDir(dir);
+    }
+
+    @Given("^I create a detached branch")
+    public void I_create_a_detached_branch() throws Throwable {
+        localRepo.runCommand(true, "log --oneline");
+        String actual = localRepo.stdOut.toString().replaceAll(LINE_SEPARATOR, "")
+                .replaceAll("\\\\", "/");
+        String[] commitId = actual.split(" ");
+        localRepo.runCommand(true, "checkout " + commitId[0]);
+    }
+
+    @Then("^the response should contain the index ID for tree \"([^\"]*)\"$")
+    public void the_response_contains_indexID(String tree) throws Throwable {
+        GeoGIG gig = localRepo.geogigCLI.getGeogig();
+
+        ObjectId canonicalTreeId = gig.command(ResolveTreeish.class).setTreeish("HEAD:" + tree).call().get();
+        Optional<IndexInfo> indexInfo = gig.getRepository().indexDatabase().getIndexInfo(tree,"pp");
+
+        Optional<ObjectId> indexedTree = gig.getRepository().indexDatabase().resolveIndexedTree(indexInfo.get(),canonicalTreeId);
+
+        if (!indexedTree.isPresent()) {
+            fail();
+        }
+        String indexId = indexedTree.get().toString();
+        String actual = localRepo.stdOut.toString().replaceAll(LINE_SEPARATOR, "")
+            .replaceAll("\\\\", "/");
+        assertTrue("'" + actual + "' does not contain ID '" + indexId.substring(0,8),
+                actual.contains(indexId.toString().substring(0,8)));
+    }
+
+    @Then("^the response should contain index info ID for tree \"([^\"]*)\"$")
+    public void the_response_contains_indexInfoID(String tree) throws Throwable {
+        Repository repo = localRepo.geogigCLI.getGeogig().getRepository();
+
+        Optional<IndexInfo> indexInfo = repo.indexDatabase().getIndexInfo(tree,"pp");
+        ObjectId oid = null;
+        if (indexInfo.isPresent()) {
+           oid = indexInfo.get().getId();
+        }
+
+        String actual = localRepo.stdOut.toString().replaceAll(LINE_SEPARATOR, "")
+            .replaceAll("\\\\", "/");
+        if (oid == null) {
+            fail();
+        } else {
+            assertTrue("'" + actual + "' does not contain ID for '"  + oid.toString(),
+                actual.contains(oid.toString()));
+        }
+    }
+
+    public void setVariable(String name, String value) {
+                this.variables.put(name, value);
+    }
+
+    public String getVariable(String name) {
+        return getVariable(name, this.variables);
+    }
+
+    static public String getVariable(String varName, Map<String, String> variables) {
+        String varValue = variables.get(varName);
+        Preconditions.checkState(varValue != null, "Variable " + varName + " does not exist");
+        return varValue;
+    }
+
+    public String replaceVariables(final String text) {
+        return replaceVariables(text, this.variables, this);
+    }
+
+    public String replaceVariables(final String text, Map<String, String> variables,
+        DefaultStepDefinitions defaultStepDefinitions) {
+        String resource = text;
+        int varIndex = -1;
+        while ((varIndex = resource.indexOf("{@")) > -1) {
+            for (int i = varIndex + 1; i < resource.length(); i++) {
+                char c = resource.charAt(i);
+                if (c == '}') {
+                    String varName = resource.substring(varIndex + 1, i);
+                    String varValue;
+                    if (defaultStepDefinitions != null && varName.startsWith("@ObjectId|")) {
+                        String[] parts = varName.split("\\|");
+                        String repoName = parts[1];
+                        // repoName for remote = "remoterepo", "localrepo" for local
+                        CLIContext context = contextProvider.getRepositoryContext(repoName);
+                        Repository repo = context.geogigCLI.getGeogig().getRepository();
+                        String ref;
+                        Optional<RevObject> object;
+                        ref = parts[2];
+                        object = repo.command(RevObjectParse.class).setRefSpec(ref).call();
+
+                        if (object.isPresent()) {
+                            varValue = object.get().getId().toString();
+                        } else {
+                            varValue = "specified ref doesn't exist";
+                        }
+                    } else {
+                        varValue = getVariable(varName, variables);
+                    }
+                    String tmp = resource.replace("{" + varName + "}", varValue);
+                    resource = tmp;
+                    break;
+                }
+            }
+        }
+        return resource;
+    }
+
+    String replaceVariables(final String text, Map<String, String> variables) {
+        return replaceVariables(text, variables, null);
     }
 }

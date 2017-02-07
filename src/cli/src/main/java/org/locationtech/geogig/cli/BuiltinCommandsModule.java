@@ -18,6 +18,7 @@ import org.locationtech.geogig.cli.plumbing.RebuildGraph;
 import org.locationtech.geogig.cli.plumbing.RevList;
 import org.locationtech.geogig.cli.plumbing.RevParse;
 import org.locationtech.geogig.cli.plumbing.ShowRef;
+import org.locationtech.geogig.cli.plumbing.VerifyPatch;
 import org.locationtech.geogig.cli.plumbing.WalkGraph;
 import org.locationtech.geogig.cli.porcelain.Add;
 import org.locationtech.geogig.cli.porcelain.Apply;
@@ -50,6 +51,7 @@ import org.locationtech.geogig.cli.porcelain.Squash;
 import org.locationtech.geogig.cli.porcelain.Status;
 import org.locationtech.geogig.cli.porcelain.Tag;
 import org.locationtech.geogig.cli.porcelain.Version;
+import org.locationtech.geogig.cli.porcelain.index.IndexCommandProxy;
 
 import com.google.inject.AbstractModule;
 
@@ -68,6 +70,7 @@ import com.google.inject.AbstractModule;
  * @see Conflicts
  * @see Diff
  * @see FormatPatch
+ * @see VerifyPatch
  * @see Help
  * @see Init
  * @see Merge
@@ -104,6 +107,7 @@ public class BuiltinCommandsModule extends AbstractModule implements CLIModule {
         bind(Diff.class);
         bind(DiffTree.class);
         bind(FormatPatch.class);
+        bind(VerifyPatch.class);
         bind(Help.class);
         bind(Init.class);
         bind(Insert.class);
@@ -131,6 +135,7 @@ public class BuiltinCommandsModule extends AbstractModule implements CLIModule {
         bind(WalkGraph.class);
         bind(Version.class);
         bind(RebuildGraph.class);
+        bind(IndexCommandProxy.class);
     }
 
 }
