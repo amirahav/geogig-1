@@ -14,12 +14,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.Nullable;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.RevFeatureType;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
 import org.locationtech.geogig.repository.IndexInfo;
 import org.locationtech.geogig.repository.IndexInfo.IndexType;
-import org.locationtech.geogig.repository.NodeRef;
 import org.opengis.feature.type.GeometryDescriptor;
 
 import com.vividsolutions.jts.geom.Envelope;
@@ -47,11 +47,21 @@ public class CreateQuadTree extends AbstractGeoGigOp<Index> {
 
     private @Nullable String geometryAttributeName;
 
+    private @Nullable Envelope bounds;
+
+    /**
+     * @param typeTreeRef the {@link NodeRef} of the canonical tree to build a quadtree from
+     * @return {@code this}
+     */
     public CreateQuadTree setTypeTreeRef(NodeRef typeTreeRef) {
         this.typeTreeRef = typeTreeRef;
         return this;
     }
 
+    /**
+     * @param treeRefSpec the refspec of the tree to build a quadtree from
+     * @return {@code this}
+     */
     public CreateQuadTree setTreeRefSpec(String treeRefSpec) {
         this.treeRefSpec = treeRefSpec;
         return this;
@@ -60,22 +70,51 @@ public class CreateQuadTree extends AbstractGeoGigOp<Index> {
     /**
      * Optional, if given, the geometry attribute to create the quadtree index for, otherwise
      * defaults to the feature type's default geometry attribute
+     * 
+     * @param geometryAttributeName the name of the geometry attribute
+     * @return {@code this}
      */
-    public CreateQuadTree setGeometryAttributeName(String geomAttName) {
-        this.geometryAttributeName = geomAttName;
+    public CreateQuadTree setGeometryAttributeName(String geometryAttributeName) {
+        this.geometryAttributeName = geometryAttributeName;
         return this;
     }
 
+    /**
+     * @param extraAttributes extra attributes to keep track of in the indexed tree
+     * @return {@code this}
+     */
     public CreateQuadTree setExtraAttributes(@Nullable List<String> extraAttributes) {
         this.extraAttributes = extraAttributes;
         return this;
     }
 
+    /**
+     * Build the indexes for the full history of the feature tree.
+     * 
+     * @param indexHistory if {@code true}, the full history of the feature tree will be built
+     * @return {@code this}
+     */
     public CreateQuadTree setIndexHistory(boolean indexHistory) {
         this.indexHistory = indexHistory;
         return this;
     }
 
+    /**
+     * Sets the bounds of the quad tree.
+     * 
+     * @param bounds the {@link Envelope} that represents the bounds of the quad tree
+     * @return {@code this}
+     */
+    public CreateQuadTree setBounds(Envelope bounds) {
+        this.bounds = bounds;
+        return this;
+    }
+
+    /**
+     * Performs the operation.
+     * 
+     * @return an {@link Index} that represents the newly created index
+     */
     @Override
     protected Index _call() {
 
@@ -89,7 +128,8 @@ public class CreateQuadTree extends AbstractGeoGigOp<Index> {
 
         final GeometryDescriptor geometryAtt = IndexUtils
                 .resolveGeometryAttribute(featureType, geometryAttributeName);
-        final Envelope maxBounds = IndexUtils.resolveMaxBounds(geometryAtt);
+        final Envelope maxBounds = this.bounds != null ? this.bounds
+                : IndexUtils.resolveMaxBounds(geometryAtt);
         final @Nullable String[] extraAttributes = IndexUtils
                 .resolveMaterializedAttributeNames(featureType, this.extraAttributes);
 

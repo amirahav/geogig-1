@@ -16,6 +16,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -27,6 +28,7 @@ import org.geotools.referencing.CRS;
 import org.locationtech.geogig.model.Bucket;
 import org.locationtech.geogig.model.FieldType;
 import org.locationtech.geogig.model.Node;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.model.RevFeature;
@@ -43,7 +45,6 @@ import org.locationtech.geogig.model.impl.RevPersonBuilder;
 import org.locationtech.geogig.model.impl.RevTagBuilder;
 import org.locationtech.geogig.model.impl.RevTreeBuilder;
 import org.locationtech.geogig.repository.DiffEntry;
-import org.locationtech.geogig.repository.NodeRef;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.AttributeType;
@@ -240,9 +241,10 @@ public class FormatCommonV1 {
         in.readFully(metadataId);
         final RevObject.TYPE contentType = RevObject.TYPE.valueOf(in.readByte());
         final Envelope bbox = readBBox(in);
+        Map<String, Object> extraData = DataStreamValueSerializerV1.INSTANCE.readMap(in);
         final Node node;
         node = Node.create(name, ObjectId.createNoClone(objectId),
-                ObjectId.createNoClone(metadataId), contentType, bbox);
+                ObjectId.createNoClone(metadataId), contentType, bbox, extraData);
         return node;
     }
 
@@ -296,7 +298,7 @@ public class FormatCommonV1 {
         for (int i = 0; i < count; i++) {
             final byte fieldTag = in.readByte();
             final FieldType fieldType = FieldType.valueOf(fieldTag);
-            Object value = DataStreamValueSerializerV1.read(fieldType, in);
+            Object value = DataStreamValueSerializerV1.INSTANCE.decode(fieldType, in);
             builder.addValue(value);
         }
 
@@ -422,6 +424,9 @@ public class FormatCommonV1 {
             envBuff.setToNull();
             node.expand(envBuff);
             writeBoundingBox(envBuff, data);
+
+            Map<String, Object> extraData = node.getExtraData();
+            DataStreamValueSerializerV1.INSTANCE.writeMap(extraData, data);
         } catch (IOException e) {
             throw Throwables.propagate(e);
         }

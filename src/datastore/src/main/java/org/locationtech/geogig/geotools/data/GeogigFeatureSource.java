@@ -28,12 +28,12 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.renderer.ScreenMap;
 import org.locationtech.geogig.geotools.data.GeoGigDataStore.ChangeType;
 import org.locationtech.geogig.geotools.data.reader.FeatureReaderBuilder;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevFeatureType;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.plumbing.RevObjectParse;
 import org.locationtech.geogig.repository.Context;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.WorkingTree;
 import org.opengis.feature.Feature;
 import org.opengis.feature.FeatureVisitor;
@@ -84,7 +84,10 @@ class GeogigFeatureSource extends ContentFeatureSource {
     @Override
     protected void addHints(Set<Hints.Key> hints) {
         hints.add(Hints.FEATURE_DETACHED);
-        hints.add(Hints.SCREENMAP);
+        // if the user turned off the screenmap, then don't advertise it (the renderer will do its own)
+        final boolean ignorescreenmap = Boolean.getBoolean("geogig.ignorescreenmap");
+        if (!ignorescreenmap)
+            hints.add(Hints.SCREENMAP);
         hints.add(Hints.JTS_GEOMETRY_FACTORY);
     }
 

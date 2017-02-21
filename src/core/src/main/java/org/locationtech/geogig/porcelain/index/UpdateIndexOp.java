@@ -13,8 +13,10 @@ import static com.google.common.base.Preconditions.checkState;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.jdt.annotation.Nullable;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevFeatureType;
 import org.locationtech.geogig.model.RevTree;
@@ -22,12 +24,11 @@ import org.locationtech.geogig.plumbing.index.BuildFullHistoryIndexOp;
 import org.locationtech.geogig.plumbing.index.BuildIndexOp;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
 import org.locationtech.geogig.repository.IndexInfo;
-import org.locationtech.geogig.repository.NodeRef;
-import org.opengis.feature.type.GeometryDescriptor;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.vividsolutions.jts.geom.Envelope;
 
 /**
  * Updates an {@link IndexInfo} with new metadata.
@@ -46,36 +47,87 @@ public class UpdateIndexOp extends AbstractGeoGigOp<Index> {
 
     private boolean indexHistory = false;
 
+    private Envelope bounds = null;
+
+    /**
+     * @param treeRefSpec the tree refspec of the index to be updated
+     * @return {@code this}
+     */
     public UpdateIndexOp setTreeRefSpec(String treeRefSpec) {
         this.treeRefSpec = treeRefSpec;
         return this;
     }
 
+    /**
+     * @param attributeName the attribute name of the index to be updated
+     * @return {@code this}
+     */
     public UpdateIndexOp setAttributeName(String attributeName) {
         this.attributeName = attributeName;
         return this;
     }
 
+    /**
+     * @param extraAttributes the extra attributes for the updated index
+     * @return {@code this}
+     * 
+     * @see #setAdd(boolean)
+     * @see #setOverwrite(boolean)
+     */
     public UpdateIndexOp setExtraAttributes(List<String> extraAttributes) {
         this.extraAttributes = extraAttributes;
         return this;
     }
 
+    /**
+     * Overwrite old extra attributes with new ones.
+     * 
+     * @param overwrite if {@code true}, the old extra attributes will be replaced with the new ones
+     * @return {@code this}
+     */
     public UpdateIndexOp setOverwrite(boolean overwrite) {
         this.overwrite = overwrite;
         return this;
     }
 
+    /**
+     * Add new extra attributes to the attributes already being tracked on the index.
+     * 
+     * @param add if {@code true}, the new extra attributes will be added to the existing ones
+     * @return {@code this}
+     */
     public UpdateIndexOp setAdd(boolean add) {
         this.add = add;
         return this;
     }
 
+    /**
+     * Rebuild the indexes for the full history of the feature tree.
+     * 
+     * @param indexHistory if {@code true}, the full history of the feature tree will be rebuilt
+     * @return {@code this}
+     */
     public UpdateIndexOp setIndexHistory(boolean indexHistory) {
         this.indexHistory = indexHistory;
         return this;
     }
 
+    /**
+     * Sets the bounds of the spatial index.
+     * 
+     * @param bounds the {@link Envelope} that represents the bounds of the spatial index
+     * @return {@code this}
+     */
+    public UpdateIndexOp setBounds(Envelope bounds) {
+        this.bounds = bounds;
+        return this;
+    }
+
+    /**
+     * Performs the operation.
+     * 
+     * @return an {@link Index} that represents the updated index
+     */
     @Override
     protected Index _call() {
         final RevFeatureType featureType;
@@ -83,56 +135,56 @@ public class UpdateIndexOp extends AbstractGeoGigOp<Index> {
         final NodeRef typeTreeRef = IndexUtils.resolveTypeTreeRef(context(), treeRefSpec);
         featureType = objectDatabase().getFeatureType(typeTreeRef.getMetadataId());
         String treeName = typeTreeRef.path();
-        final GeometryDescriptor geometryAtt = IndexUtils.resolveGeometryAttribute(featureType,
+        IndexInfo oldIndexInfo = IndexUtils.resolveIndexInfo(indexDatabase(), treeName,
                 attributeName);
-        final String geometryAttributeName = geometryAtt.getLocalName();
-
-        Optional<IndexInfo> indexInfo = indexDatabase().getIndexInfo(treeName,
-                geometryAttributeName);
-        checkState(indexInfo.isPresent(), "A matching index could not be found to update.");
         
         final @Nullable String[] newAttributes = IndexUtils
                 .resolveMaterializedAttributeNames(featureType, extraAttributes);
 
-        IndexInfo oldIndexInfo = indexInfo.get();
         IndexInfo newIndexInfo = null;
         Map<String, Object> newMetadata = Maps.newHashMap(oldIndexInfo.getMetadata());
         String[] oldAttributes = (String[]) newMetadata
                 .get(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA);
-        List<String> updatedAttributes;
-        if (oldAttributes == null || oldAttributes.length == 0) {
-            if (newAttributes == null) {
-                updatedAttributes = null;
+        String[] updatedAttributes;
+        if (add) {
+            if (oldAttributes == null) {
+                updatedAttributes = newAttributes;
+            } else if (newAttributes == null) {
+                updatedAttributes = oldAttributes;
             } else {
-                updatedAttributes = Lists.newArrayList(newAttributes);
+                Set<String> oldSet = Sets.newHashSet(oldAttributes);
+                Set<String> newSet = Sets.newHashSet(newAttributes);
+                oldSet.addAll(newSet);
+                updatedAttributes = oldSet.toArray(new String[oldSet.size()]);
             }
-        } else {
-            checkState(overwrite || add,
+        } else if (overwrite) {
+            updatedAttributes = newAttributes;
+        } else if (newAttributes != null) {
+            checkState(oldAttributes == null,
                     "Extra attributes already exist on index, specify add or overwrite to update.");
-            if (overwrite) {
-                if (newAttributes == null) {
-                    updatedAttributes = null;
-                } else {
-                    updatedAttributes = Lists.newArrayList(newAttributes);
-                }
-            } else {
-                updatedAttributes = Lists.newArrayList(oldAttributes);
-                if (newAttributes != null) {
-                    for (int i = 0; i < newAttributes.length; i++) {
-                        if (!updatedAttributes.contains(newAttributes[i])) {
-                            updatedAttributes.add(newAttributes[i]);
-                        }
-                    }
-                }
-            }
-        }
-        if (updatedAttributes == null) {
-            newMetadata.remove(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA);
+            updatedAttributes = newAttributes;
         } else {
-            newMetadata.put(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA,
-                updatedAttributes.toArray(new String[updatedAttributes.size()]));
+            updatedAttributes = oldAttributes;
         }
-        newIndexInfo = indexDatabase().updateIndexInfo(treeName, geometryAttributeName,
+
+        boolean updated = false;
+        if (!contentsEqual(updatedAttributes, oldAttributes)) {
+            if (updatedAttributes == null) {
+                newMetadata.remove(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA);
+            } else {
+                newMetadata.put(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA, updatedAttributes);
+            }
+            updated = true;
+        }
+
+        if (bounds != null) {
+            newMetadata.put(IndexInfo.MD_QUAD_MAX_BOUNDS, bounds);
+            updated = true;
+        }
+
+        checkState(updated, "Nothing to update...");
+
+        newIndexInfo = indexDatabase().updateIndexInfo(treeName, oldIndexInfo.getAttributeName(),
                 oldIndexInfo.getIndexType(), newMetadata);
 
         RevTree canonicalTree = objectDatabase().getTree(typeTreeRef.getObjectId());
@@ -142,7 +194,7 @@ public class UpdateIndexOp extends AbstractGeoGigOp<Index> {
         if (indexHistory) {
             command(BuildFullHistoryIndexOp.class)//
                     .setTreeRefSpec(treeRefSpec)//
-                    .setAttributeName(geometryAttributeName)//
+                    .setAttributeName(oldIndexInfo.getAttributeName())//
                     .setProgressListener(getProgressListener())//
                     .call();
             Optional<ObjectId> headIndexedTreeId = indexDatabase().resolveIndexedTree(newIndexInfo,
@@ -161,5 +213,17 @@ public class UpdateIndexOp extends AbstractGeoGigOp<Index> {
         }
 
         return new Index(newIndexInfo, indexedTreeId, indexDatabase());
+    }
+
+    private boolean contentsEqual(@Nullable String[] left, @Nullable String[] right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        Set<String> leftSet = Sets.newHashSet(left);
+        Set<String> rightSet = Sets.newHashSet(right);
+        return leftSet.containsAll(rightSet) && rightSet.containsAll(leftSet);
     }
 }

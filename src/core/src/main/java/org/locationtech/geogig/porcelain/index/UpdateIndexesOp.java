@@ -10,6 +10,7 @@ import java.util.Map;
 import org.eclipse.jdt.annotation.Nullable;
 import org.geotools.geometry.jts.JTS;
 import org.locationtech.geogig.data.FindFeatureTypeTrees;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevTree;
@@ -17,7 +18,6 @@ import org.locationtech.geogig.model.SymRef;
 import org.locationtech.geogig.plumbing.index.BuildIndexOp;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
 import org.locationtech.geogig.repository.IndexInfo;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.ProgressListener;
 import org.locationtech.geogig.repository.impl.SpatialOps;
 import org.locationtech.geogig.storage.IndexDatabase;
@@ -42,6 +42,7 @@ public class UpdateIndexesOp extends AbstractGeoGigOp<List<Index>> {
 
     /**
      * @param branchRef the refSpec that resolves to a root tree
+     * @return {@code this}
      */
     public UpdateIndexesOp setRef(final Ref branchRef) {
         checkNotNull(branchRef);
@@ -53,6 +54,11 @@ public class UpdateIndexesOp extends AbstractGeoGigOp<List<Index>> {
         return this;
     }
 
+    /**
+     * Performs the operation.
+     * 
+     * @return a list of {@link Index} objects that represent updated indexes
+     */
     @Override
     protected List<Index> _call() {
         checkNotNull(rootRefSpec, "rootRefSpec not provided");

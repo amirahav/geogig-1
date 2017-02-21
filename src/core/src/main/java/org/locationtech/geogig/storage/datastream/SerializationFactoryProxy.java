@@ -9,12 +9,12 @@
  */
 package org.locationtech.geogig.storage.datastream;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevObject;
 import org.locationtech.geogig.storage.impl.ObjectSerializingFactory;
@@ -44,7 +44,7 @@ public class SerializationFactoryProxy implements ObjectSerializingFactory {
     private static final ObjectSerializingFactory[] SUPPORTED_FORMATS = { //
             new LZFSerializationFactory(DataStreamSerializationFactoryV1.INSTANCE), //
             new LZFSerializationFactory(DataStreamSerializationFactoryV2.INSTANCE), //
-            new LZFSerializationFactory(DataStreamSerializationFactoryV2_1.INSTANCE) //
+            new LZFSerializationFactory(DataStreamSerializationFactoryV2_1.INSTANCE)//
     };
 
     private static final int MAX_FORMAT_CODE = SUPPORTED_FORMATS.length - 1;
@@ -70,15 +70,25 @@ public class SerializationFactoryProxy implements ObjectSerializingFactory {
         return revObject;
     }
 
+    @Override
+    public RevObject read(@Nullable ObjectId id, byte[] data, int offset, int length) {
+        final int serialVersionHeader = data[offset] & 0xFF;
+        assert serialVersionHeader >= 0 && serialVersionHeader <= MAX_FORMAT_CODE;
+        final ObjectSerializingFactory serializer = SUPPORTED_FORMATS[serialVersionHeader];
+        RevObject revObject;
+        try {
+            revObject = serializer.read(id, data, offset + 1, length - 1);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading object " + id, e);
+        }
+        return revObject;
+    }
+
     /**
      * Reads object from its binary representation as stored in the database.
      */
     public RevObject decode(final ObjectId id, final byte[] bytes) {
-        try (ByteArrayInputStream in = new ByteArrayInputStream(bytes)) {
-            return read(id, in);
-        } catch (IOException e) {
-            throw new RuntimeException("Error reading object " + id, e);
-        }
+        return read(id, bytes, 0, bytes.length);
     }
 
     public byte[] encode(final RevObject o) {
@@ -89,6 +99,19 @@ public class SerializationFactoryProxy implements ObjectSerializingFactory {
         } catch (Exception e) {
             throw new RuntimeException("Error encoding object " + o, e);
         }
+    }
+
+    @Override
+    public String getDisplayName() {
+        StringBuilder sb = new StringBuilder("Proxy[");
+        for (ObjectSerializingFactory f : SUPPORTED_FORMATS) {
+            sb.append(f.getDisplayName()).append(", ");
+        }
+        if (sb.length() > 2) {
+            sb.setLength(sb.length() - 2);
+        }
+        sb.append(']');
+        return sb.toString();
     }
 
 }

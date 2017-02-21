@@ -20,13 +20,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.locationtech.geogig.model.Node;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.porcelain.BranchCreateOp;
 import org.locationtech.geogig.porcelain.CheckoutOp;
 import org.locationtech.geogig.porcelain.RemoveOp;
 import org.locationtech.geogig.repository.IndexInfo;
 import org.locationtech.geogig.repository.IndexInfo.IndexType;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.storage.IndexDatabase;
 import org.locationtech.geogig.test.integration.RepositoryTestCase;
@@ -122,7 +122,30 @@ public class BuildFullHistoryIndexOpTest extends RepositoryTestCase {
     @Test
     public void testBuildFullHistoryNoIndex() {
         exception.expect(IllegalStateException.class);
-        exception.expectMessage("a matching index could not be found");
+        exception.expectMessage("No indexes could be found for the specified tree.");
+        geogig.command(BuildFullHistoryIndexOp.class)//
+                .setTreeRefSpec(worldPointsLayer.getName())//
+                .call();
+    }
+
+    @Test
+    public void testBuildFullHistoryNoMatchingIndex() {
+        indexdb.createIndexInfo(worldPointsLayer.getName(), "x", IndexType.QUADTREE, null);
+        exception.expect(IllegalStateException.class);
+        exception.expectMessage("A matching index could not be found.");
+        geogig.command(BuildFullHistoryIndexOp.class)//
+                .setTreeRefSpec(worldPointsLayer.getName())//
+                .setAttributeName("y")//
+                .call();
+    }
+
+    @Test
+    public void testBuildFullHistoryMultipleMatchingIndexes() {
+        indexdb.createIndexInfo(worldPointsLayer.getName(), "x", IndexType.QUADTREE, null);
+        indexdb.createIndexInfo(worldPointsLayer.getName(), "y", IndexType.QUADTREE, null);
+        exception.expect(IllegalStateException.class);
+        exception.expectMessage(
+                "Multiple indexes were found for the specified tree, please specify the attribute.");
         geogig.command(BuildFullHistoryIndexOp.class)//
                 .setTreeRefSpec(worldPointsLayer.getName())//
                 .call();

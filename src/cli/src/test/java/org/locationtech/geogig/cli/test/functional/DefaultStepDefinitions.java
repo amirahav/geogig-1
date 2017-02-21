@@ -33,18 +33,25 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.hamcrest.core.StringStartsWith;
 import org.junit.Assert;
 import org.locationtech.geogig.cli.ArgumentTokenizer;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevFeatureType;
 import org.locationtech.geogig.model.RevObject;
+import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.model.impl.RevFeatureTypeBuilder;
+import org.locationtech.geogig.model.impl.RevObjectTestSupport;
 import org.locationtech.geogig.plumbing.RefParse;
 import org.locationtech.geogig.plumbing.ResolveTreeish;
 import org.locationtech.geogig.plumbing.RevObjectParse;
@@ -57,13 +64,14 @@ import org.locationtech.geogig.plumbing.diff.PatchSerializer;
 import org.locationtech.geogig.porcelain.MergeConflictsException;
 import org.locationtech.geogig.porcelain.MergeOp;
 import org.locationtech.geogig.porcelain.TagCreateOp;
+import org.locationtech.geogig.porcelain.index.IndexUtils;
 import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.IndexInfo;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.repository.RepositoryResolver;
 import org.locationtech.geogig.repository.WorkingTree;
 import org.locationtech.geogig.repository.impl.GeoGIG;
+import org.locationtech.geogig.repository.impl.SpatialOps;
 import org.opengis.feature.Feature;
 import org.opengis.feature.type.PropertyDescriptor;
 import org.slf4j.Logger;
@@ -72,9 +80,13 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.SetMultimap;
 import com.google.common.io.Files;
+import com.vividsolutions.jts.geom.Envelope;
 
+import cucumber.api.DataTable;
 import cucumber.api.Scenario;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
@@ -727,6 +739,155 @@ public class DefaultStepDefinitions {
         } else {
             assertTrue("'" + actual + "' does not contain ID for '"  + oid.toString(),
                 actual.contains(oid.toString()));
+        }
+    }
+
+    /**
+     * Checks that the local repository, at it's commit {@code headRef}, has the expected features
+     * as given by the {@code expectedFeatures} {@link DataTable}.
+     * <p>
+     * The {@code DataTable} top cells represent feature tree paths, and their cells beneath each
+     * feature tree path, the feature ids expected for each layer.
+     * <p>
+     * A {@code question mark} indicates a wild card feature where the feature id may not be known.
+     * <p>
+     * Example:
+     * 
+     * <pre>
+     * <code>
+     *     |  Points   |  Lines   |  Polygons   | 
+     *     |  Points.1 |  Lines.1 |  Polygons.1 | 
+     *     |  Points.2 |  Lines.2 |  Polygons.2 | 
+     *     |  ?        |          |             |
+     *</code>
+     * </pre>
+     * 
+     * @param headRef
+     * @param expectedFeatures
+     * @param index
+     * @throws Throwable
+     */
+    private void verifyRepositoryContents(String headRef, DataTable expectedFeatures,
+            boolean index) {
+        SetMultimap<String, String> expected = HashMultimap.create();
+        {
+            List<Map<String, String>> asMaps = expectedFeatures.asMaps(String.class, String.class);
+            for (Map<String, String> featureMap : asMaps) {
+                for (Entry<String, String> entry : featureMap.entrySet()) {
+                    if (entry.getValue().length() > 0) {
+                        expected.put(entry.getKey(), replaceVariables(entry.getValue()));
+                    }
+                }
+            }
+        }
+
+        SetMultimap<String, String> actual = localRepo.listRepo(headRef, index);
+
+        Map<String, Collection<String>> actualMap = actual.asMap();
+        Map<String, Collection<String>> expectedMap = expected.asMap();
+
+        for (String featureType : actualMap.keySet()) {
+            assertTrue(expectedMap.containsKey(featureType));
+            Collection<String> actualFeatureCollection = actualMap.get(featureType);
+            Collection<String> expectedFeatureCollection = expectedMap.get(featureType);
+            for (String actualFeature : actualFeatureCollection) {
+                if (expectedFeatureCollection.contains(actualFeature)) {
+                    expectedFeatureCollection.remove(actualFeature);
+                } else if (expectedFeatureCollection.contains("?")) {
+                    expectedFeatureCollection.remove("?");
+                } else {
+                    fail();
+                }
+            }
+            assertEquals(0, expectedFeatureCollection.size());
+            expectedMap.remove(featureType);
+        }
+        assertEquals(0, expectedMap.size());
+    }
+
+    private Optional<ObjectId> resolveIndexTreeId(String headRef, @Nullable String attributeName) {
+        Repository repo = localRepo.geogigCLI.getGeogig().getRepository();
+        final NodeRef typeTreeRef = IndexUtils.resolveTypeTreeRef(repo.context(), headRef);
+        String treeName = typeTreeRef.path();
+        IndexInfo indexInfo = IndexUtils.resolveIndexInfo(repo.indexDatabase(), treeName,
+                attributeName);
+        Optional<ObjectId> indexTreeId = repo.indexDatabase().resolveIndexedTree(indexInfo,
+                typeTreeRef.getObjectId());
+        return indexTreeId;
+    }
+
+    @Then("^the repository's \"([^\"]*)\" index on the \"([^\"]*)\" attribute should have the following features:$")
+    public void verifyIndexContents(String headRef, String attributeName,
+            DataTable expectedFeatures) throws Throwable {
+        Optional<ObjectId> indexTreeId = resolveIndexTreeId(headRef, attributeName);
+        assertTrue(indexTreeId.isPresent());
+        verifyRepositoryContents(indexTreeId.get().toString(), expectedFeatures, true);
+    }
+
+    @Then("^the repository's \"([^\"]*)\" index should have the following features:$")
+    public void verifyIndexContents(String headRef,
+            DataTable expectedFeatures) throws Throwable {
+        verifyIndexContents(headRef, null, expectedFeatures);
+    }
+
+    @Then("^the repository's \"([^\"]*)\" should not have an index$")
+    public void noIndexAtCommit(String headRef) throws Throwable {
+        Optional<ObjectId> indexTreeId = resolveIndexTreeId(headRef, null);
+        assertFalse(indexTreeId.isPresent());
+    }
+
+    @Then("^the repository's \"([^\"]*)\" index bounds should be \"([^\"]*)\"$")
+    public void verifyIndexBounds(String headRef, String bbox) throws Throwable {
+        Repository repo = localRepo.geogigCLI.getGeogig().getRepository();
+        final NodeRef typeTreeRef = IndexUtils.resolveTypeTreeRef(repo.context(), headRef);
+        String treeName = typeTreeRef.path();
+        IndexInfo indexInfo = IndexUtils.resolveIndexInfo(repo.indexDatabase(), treeName, null);
+        Map<String, Object> metadata = indexInfo.getMetadata();
+        assertTrue(metadata.containsKey(IndexInfo.MD_QUAD_MAX_BOUNDS));
+        Envelope indexBounds = (Envelope) metadata.get(IndexInfo.MD_QUAD_MAX_BOUNDS);
+        Envelope expected = SpatialOps.parseNonReferencedBBOX(bbox);
+        final double EPSILON = 0.00001;
+        assertEquals(expected.getMinX(), indexBounds.getMinX(), EPSILON);
+        assertEquals(expected.getMaxX(), indexBounds.getMaxX(), EPSILON);
+        assertEquals(expected.getMinY(), indexBounds.getMinY(), EPSILON);
+        assertEquals(expected.getMaxY(), indexBounds.getMaxY(), EPSILON);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Then("^the repository's \"([^\"]*)\" index should track the extra attribute \"([^\"]*)\"$")
+    public void verifyIndexExtraAttributes(String headRef, String attributeName) throws Throwable {
+        Repository repo = localRepo.geogigCLI.getGeogig().getRepository();
+        Optional<ObjectId> indexTreeId = resolveIndexTreeId(headRef, null);
+        assertTrue(indexTreeId.isPresent());
+        RevTree indexTree = repo.indexDatabase().getTree(indexTreeId.get());
+        Set<org.locationtech.geogig.model.Node> nodes = RevObjectTestSupport.getTreeNodes(indexTree,
+                repo.indexDatabase());
+        for (org.locationtech.geogig.model.Node n : nodes) {
+            Map<String, Object> extraData = n.getExtraData();
+            assertTrue(extraData.containsKey(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA));
+            Map<String, Object> attributeData = (Map<String, Object>) extraData
+                    .get(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA);
+            assertTrue(attributeData.containsKey(attributeName));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Then("^the repository's \"([^\"]*)\" index should not track the extra attribute \"([^\"]*)\"$")
+    public void verifyIndexNotExtraAttributes(String headRef, String attributeName)
+            throws Throwable {
+        Repository repo = localRepo.geogigCLI.getGeogig().getRepository();
+        Optional<ObjectId> indexTreeId = resolveIndexTreeId(headRef, null);
+        assertTrue(indexTreeId.isPresent());
+        RevTree indexTree = repo.indexDatabase().getTree(indexTreeId.get());
+        Set<org.locationtech.geogig.model.Node> nodes = RevObjectTestSupport.getTreeNodes(indexTree,
+                repo.indexDatabase());
+        for (org.locationtech.geogig.model.Node n : nodes) {
+            Map<String, Object> extraData = n.getExtraData();
+            if (extraData.containsKey(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA)) {
+                Map<String, Object> attributeData = (Map<String, Object>) extraData
+                        .get(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA);
+                assertFalse(attributeData.containsKey(attributeName));
+            }
         }
     }
 

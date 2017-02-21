@@ -14,6 +14,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.notNull;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -27,6 +28,7 @@ import org.geotools.data.Query;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.feature.SchemaException;
 import org.geotools.filter.spatial.ReprojectingFilterVisitor;
+import org.geotools.filter.visitor.AbstractFilterVisitor;
 import org.geotools.filter.visitor.SimplifyingFilterVisitor;
 import org.geotools.filter.visitor.SpatialFilterVisitor;
 import org.geotools.geometry.jts.ReferencedEnvelope;
@@ -35,6 +37,7 @@ import org.geotools.renderer.ScreenMap;
 import org.locationtech.geogig.data.retrieve.BulkFeatureRetriever;
 import org.locationtech.geogig.geotools.data.GeoGigDataStore.ChangeType;
 import org.locationtech.geogig.model.Bounded;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevTree;
@@ -42,12 +45,11 @@ import org.locationtech.geogig.plumbing.DiffTree;
 import org.locationtech.geogig.plumbing.FindTreeChild;
 import org.locationtech.geogig.plumbing.ResolveTreeish;
 import org.locationtech.geogig.porcelain.index.Index;
-import org.locationtech.geogig.repository.AutoCloseableIterator;
 import org.locationtech.geogig.repository.Context;
 import org.locationtech.geogig.repository.DiffEntry;
 import org.locationtech.geogig.repository.IndexInfo;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.impl.SpatialOps;
+import org.locationtech.geogig.storage.AutoCloseableIterator;
 import org.locationtech.geogig.storage.IndexDatabase;
 import org.locationtech.geogig.storage.ObjectStore;
 import org.opengis.feature.simple.SimpleFeature;
@@ -61,6 +63,7 @@ import org.opengis.filter.identity.FeatureId;
 import org.opengis.filter.identity.Identifier;
 import org.opengis.filter.sort.SortBy;
 import org.opengis.filter.spatial.BBOX;
+import org.opengis.filter.spatial.BinarySpatialOperator;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -219,14 +222,14 @@ public class FeatureReaderBuilder {
         // properties, empty list means no-properties needed
         final @Nullable Set<String> requiredProperties = resolveRequiredProperties(nativeFilter);
         // properties present in the RevTree nodes' extra data
-        final Set<String> materializedProperties;
+        final Set<String> materializedIndexProperties;
         // whether the RevTree nodes contain all required properties (hence no need to fetch
         // RevFeatures from the database)
         final boolean indexContainsAllRequiredProperties;
         // whether the filter is fully supported by the NodeRef filtering (hence no need for
         // pos-processing filtering). This is the case if the filter is a simple BBOX, Id, or
         // INCLUDE, or all the required properties are present in the index Nodes
-        final boolean filterIsFullySupported;
+        final boolean filterIsFullySupportedByIndex;
 
         final ObjectId featureTypeId = typeRef.getMetadataId();
 
@@ -279,11 +282,12 @@ public class FeatureReaderBuilder {
                 newFeatureTypeTree = newCanonicalTreeId;
             }
 
-            materializedProperties = resolveMaterializedProperties(headIndex);
-            indexContainsAllRequiredProperties = materializedProperties
+            materializedIndexProperties = resolveMaterializedProperties(headIndex);
+            indexContainsAllRequiredProperties = materializedIndexProperties
                     .containsAll(requiredProperties);
-            filterIsFullySupported = filterIsFullySupported(nativeFilter,
-                    indexContainsAllRequiredProperties);
+            filterIsFullySupportedByIndex = filterIsFullySupported(nativeFilter,
+                    materializedIndexProperties, requiredProperties);
+
             treeSource = headIndex.isPresent() ? repo.indexDatabase() : repo.objectDatabase();
         }
 
@@ -293,31 +297,25 @@ public class FeatureReaderBuilder {
         // TODO: for some reason setting the default metadata id is making several tests fail,
         // though it's not really needed here because we have the FeatureType already. Nonetheless
         // this is strange and needs to be revisited.
-        diffOp.setDefaultMetadataId(featureTypeId);
-        diffOp.setPreserveIterationOrder(shallPreserveIterationOrder());
-        diffOp.setPathFilter(resolveFidFilter(nativeFilter));
-        diffOp.setCustomFilter(resolveNodeRefFilter(nativeFilter, materializedProperties));
-        diffOp.setBoundsFilter(resolveBoundsFilter(nativeFilter, newFeatureTypeTree, treeSource));
-        diffOp.setChangeTypeFilter(resolveChangeType());
-        diffOp.setOldTree(oldFeatureTypeTree);
-        diffOp.setNewTree(newFeatureTypeTree);
-        diffOp.setLeftSource(treeSource);
-        diffOp.setRightSource(treeSource);
-        diffOp.recordStats();
+        diffOp.setDefaultMetadataId(featureTypeId) //
+              .setPreserveIterationOrder(shallPreserveIterationOrder())//
+              .setPathFilter(createFidFilter(nativeFilter)) //
+              .setCustomFilter(createIndexPreFilter(nativeFilter, materializedIndexProperties,filterIsFullySupportedByIndex)) //
+              .setBoundsFilter(createBoundsFilter(nativeFilter, newFeatureTypeTree, treeSource)) //
+              .setChangeTypeFilter(resolveChangeType()) //
+              .setOldTree(oldFeatureTypeTree) //
+              .setNewTree(newFeatureTypeTree)  //
+              .setLeftSource(treeSource)   //
+              .setRightSource(treeSource) //
+              .recordStats();
 
         AutoCloseableIterator<DiffEntry> diffs;
         diffs = diffOp.call();
-        {
-            // Stopwatch sw = Stopwatch.createStarted();
-            // int size = Iterators.size(diffs);
-            // diffs.close();
-            // System.err.printf("traversed %,d noderefs in %s\n", size, sw.stop());
-            // diffs = diffOp.call();
-        }
+
         AutoCloseableIterator<NodeRef> featureRefs = toFeatureRefs(diffs, changeType);
 
         // post-processing
-        if (filterIsFullySupported) {
+        if (filterIsFullySupportedByIndex) {
             featureRefs = applyOffsetAndLimit(featureRefs);
         }
 
@@ -337,18 +335,31 @@ public class FeatureReaderBuilder {
             features = retriever.getGeoToolsFeatures(featureRefs, fullSchema, geometryFactory);
         }
 
-        if (!filterIsFullySupported) {
-            PostFilter filterPredicate = new PostFilter(nativeFilter);
-            features = AutoCloseableIterator.filter(features, filterPredicate);
-            features = applyOffsetAndLimit(features);
+        if (!filterIsFullySupportedByIndex) {
+            features = applyPostFilter(nativeFilter,features);
+        }
+
+        if (screenMap != null) {
+            features = AutoCloseableIterator.transform(features, new ScreenMapGeometryReplacer(screenMap));
         }
 
         FeatureReader<SimpleFeatureType, SimpleFeature> featureReader;
-
         featureReader = new FeatureReaderAdapter<SimpleFeatureType, SimpleFeature>(resultSchema,
                 features);
 
         return featureReader;
+    }
+
+    private AutoCloseableIterator<SimpleFeature> applyPostFilter(Filter nativeFilter, AutoCloseableIterator<SimpleFeature> features) {
+        PostFilter filterPredicate = new PostFilter(nativeFilter);
+        features = AutoCloseableIterator.filter(features, filterPredicate);
+        if (screenMap != null) {
+            Predicate<SimpleFeature> screenMapFilter = new FeatureScreenMapPredicate(screenMap);
+            features = AutoCloseableIterator.filter(features, screenMapFilter);
+        }
+
+        features = applyOffsetAndLimit(features);
+        return features;
     }
 
     private SimpleFeatureType resolveOutputSchema(Set<String> requiredProperties) {
@@ -447,15 +458,31 @@ public class FeatureReaderBuilder {
         return Optional.fromNullable(index);
     }
 
-    private boolean filterIsFullySupported(Filter nativeFilter,
-            boolean indexContainsAllRequiredProperties) {
+     static boolean filterIsFullySupported(Filter nativeFilter,
+                                    Set<String> materializedProperties,
+                                    Set<String> filterProperties) {
 
-        boolean filterSupported = Filter.INCLUDE.equals(nativeFilter) || //
-                nativeFilter instanceof BBOX || //
-                nativeFilter instanceof Id || //
-                indexContainsAllRequiredProperties;
+        if (Filter.INCLUDE.equals(nativeFilter) ||
+                nativeFilter instanceof BBOX ||
+                nativeFilter instanceof Id) {
+            return true; // simple case
+        }
 
-        return filterSupported;
+        if (materializedProperties.containsAll(filterProperties)) {
+            return true; // this is unlikely to happen, unless geom is in index
+        }
+
+         Set<String> missingAttributes = Sets.difference(filterProperties, materializedProperties);
+
+        if (missingAttributes.size() > 1) {
+            return false; // 2+ attributes missing.  We can possibly handle the geom, but not 2+
+        }
+
+        String missingAttribute = missingAttributes.iterator().next(); //there's exactly 1
+        VerifySimpleBBoxUsage visitor = new VerifySimpleBBoxUsage(missingAttribute);
+        nativeFilter.accept(visitor, null);
+
+        return  visitor.isSimple();
     }
 
     private Set<String> resolveMaterializedProperties(Optional<Index> index) {
@@ -472,7 +499,7 @@ public class FeatureReaderBuilder {
      * properties requested by {@link #propertyNames} and any other property needed to evaluate the
      * {@link #filter} in-process.
      */
-    private Set<String> resolveRequiredProperties(Filter nativeFilter) {
+     Set<String> resolveRequiredProperties(Filter nativeFilter) {
         if (outputSchemaPropertyNames == Query.ALL_NAMES) {
             return fullSchemaAttributeNames;
         }
@@ -550,8 +577,8 @@ public class FeatureReaderBuilder {
         }
     }
 
-    private @Nullable ReferencedEnvelope resolveBoundsFilter(Filter filterInNativeCrs,
-            ObjectId featureTypeTreeId, ObjectStore treeSource) {
+    private @Nullable ReferencedEnvelope createBoundsFilter(Filter filterInNativeCrs,
+                                                            ObjectId featureTypeTreeId, ObjectStore treeSource) {
         if (RevTree.EMPTY_TREE_ID.equals(featureTypeTreeId)) {
             return null;
         }
@@ -583,22 +610,30 @@ public class FeatureReaderBuilder {
         }
     }
 
+    /**
+     *
+     * @param filter
+     * @param materializedProperties
+     * @param indexFullySupportsQuery  -- if fully supported, use the screenmap
+     * @return
+     */
     @VisibleForTesting
-    Predicate<Bounded> resolveNodeRefFilter(final Filter filter,
-            final Set<String> materializedProperties) {
+    Predicate<Bounded> createIndexPreFilter(final Filter filter,
+                                            final Set<String> materializedProperties, boolean indexFullySupportsQuery) {
 
         Predicate<Bounded> preFilter = new PreFilterBuilder(materializedProperties).build(filter);
 
         final boolean ignore = Boolean.getBoolean("geogig.ignorescreenmap");
-        if (screenMap != null && !ignore) {
-            Predicate<Bounded> screenMapFilter;
-            screenMapFilter = new ScreenMapPredicate(screenMap);
+        //if the index is not fully supported, do not apply the screenmap filter at this stage
+        // otherwise we will remove too many features
+        if (screenMap != null && !ignore && indexFullySupportsQuery) {
+            Predicate<Bounded> screenMapFilter = new ScreenMapPredicate(screenMap);
             preFilter = Predicates.and(preFilter, screenMapFilter);
         }
         return preFilter;
     }
 
-    private List<String> resolveFidFilter(Filter filter) {
+    private List<String> createFidFilter(Filter filter) {
         List<String> pathFilters = ImmutableList.of();
         if (filter instanceof Id) {
             final Set<Identifier> identifiers = ((Id) filter).getIdentifiers();
@@ -630,5 +665,58 @@ public class FeatureReaderBuilder {
         // in-process so there's no point in forcing the iteration order here
         // preserveIterationOrder |= sortBy != null && sortBy.length > 0;
         return preserveIterationOrder;
+    }
+
+
+    public static class VerifySimpleBBoxUsage extends AbstractFilterVisitor {
+
+        public boolean isUsedInGeometryExpression = false;
+        public boolean isUsedInBBoxExpression = false;
+        public boolean isUsedInNonBBoxExpression = false;
+
+        public boolean isComplexGeomExpressions = false;
+
+        String propertyName;
+
+        public VerifySimpleBBoxUsage(String propertyName) {
+            super();
+            this.propertyName = propertyName;
+        }
+
+        public boolean isSimple() {
+            if (isComplexGeomExpressions || isUsedInNonBBoxExpression)
+                return false;
+
+            return isUsedInGeometryExpression && isUsedInBBoxExpression;
+        }
+
+        @Override
+        protected Object visit(BinarySpatialOperator filter, Object data) {
+            String[] attributes = DataUtilities.attributeNames(filter);
+
+            if (attributes.length == 0) {
+                return filter; // this should have been optimized away
+            }
+
+            if (attributes.length > 1) {
+                isComplexGeomExpressions = true; //fail -- to complex
+                return filter;
+            }
+
+            String attribute = attributes[0];
+
+            if (!attribute.equals(propertyName)) {
+                return filter; // not our attribute
+            }
+            isUsedInGeometryExpression = true;
+
+            if (filter instanceof BBOX) {
+                isUsedInBBoxExpression = true;
+                return filter;
+            }
+            //bad
+            isUsedInNonBBoxExpression = true;
+            return filter;
+        }
     }
 }

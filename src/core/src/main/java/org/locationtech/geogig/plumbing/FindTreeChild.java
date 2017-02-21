@@ -12,11 +12,11 @@ package org.locationtech.geogig.plumbing;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import org.locationtech.geogig.model.Node;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.impl.DepthSearch;
 import org.locationtech.geogig.storage.ObjectStore;
 
@@ -39,6 +39,8 @@ public class FindTreeChild extends AbstractGeoGigOp<Optional<NodeRef>> {
     private String childPath;
 
     private String parentPath;
+
+    private ObjectStore source;
 
     /**
      * @param tree a supplier that resolves to the tree where to start the search for the nested
@@ -78,6 +80,15 @@ public class FindTreeChild extends AbstractGeoGigOp<Optional<NodeRef>> {
     }
 
     /**
+     * @param source the object source
+     * @return {@code this}
+     */
+    public FindTreeChild setSource(ObjectStore source) {
+        this.source = source;
+        return this;
+    }
+
+    /**
      * Executes the command.
      * 
      * @return an {@code Optional} that contains the Node if it was found, or
@@ -86,21 +97,25 @@ public class FindTreeChild extends AbstractGeoGigOp<Optional<NodeRef>> {
     @Override
     protected Optional<NodeRef> _call() {
         checkNotNull(childPath, "childPath");
+        if (source == null) {
+            this.source = objectDatabase();
+        }
         final RevTree tree;
         if (parent == null) {
-            ObjectId rootTreeId = command(ResolveTreeish.class).setTreeish(Ref.HEAD).call().get();
+            ObjectId rootTreeId = command(ResolveTreeish.class).setSource(source)
+                    .setTreeish(Ref.HEAD).call().get();
             if (rootTreeId.isNull()) {
                 return Optional.absent();
             }
-            tree = command(RevObjectParse.class).setObjectId(rootTreeId).call(RevTree.class).get();
+            tree = command(RevObjectParse.class).setSource(source).setObjectId(rootTreeId)
+                    .call(RevTree.class).get();
         } else {
             tree = parent.get();
         }
         final String path = childPath;
         final String parentPath = this.parentPath == null ? "" : this.parentPath;
-        final ObjectStore target = objectDatabase();
 
-        DepthSearch depthSearch = new DepthSearch(target);
+        DepthSearch depthSearch = new DepthSearch(source);
         Optional<NodeRef> childRef = depthSearch.find(tree, parentPath, path);
         return childRef;
 

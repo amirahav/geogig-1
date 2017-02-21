@@ -21,10 +21,10 @@ import org.geotools.feature.simple.SimpleFeatureImpl;
 import org.geotools.filter.identity.FeatureIdImpl;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.locationtech.geogig.model.Node;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.RevFeature;
-import org.locationtech.geogig.repository.AutoCloseableIterator;
 import org.locationtech.geogig.repository.IndexInfo;
-import org.locationtech.geogig.repository.NodeRef;
+import org.locationtech.geogig.storage.AutoCloseableIterator;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -110,9 +110,6 @@ class MaterializedIndexFeatureIterator implements AutoCloseableIterator<SimpleFe
             return BoundedSimpleFeature.empty(featureType, node.getNode(), crs);
 
         } else {
-            final Map<String, Object> extraData = node.getNode().getExtraData();
-            checkNotNull(extraData);
-
             final Map<String, Object> materializedAttributes;
             materializedAttributes = IndexInfo.getMaterializedAttributes(node.getNode());
             checkNotNull(materializedAttributes);

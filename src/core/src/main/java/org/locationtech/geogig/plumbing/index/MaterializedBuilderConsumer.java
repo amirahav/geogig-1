@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.Bucket;
 import org.locationtech.geogig.model.Node;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevFeature;
 import org.locationtech.geogig.model.RevObject.TYPE;
@@ -30,7 +31,6 @@ import org.locationtech.geogig.model.impl.RevTreeBuilder;
 import org.locationtech.geogig.plumbing.diff.PreOrderDiffWalk.AbstractConsumer;
 import org.locationtech.geogig.plumbing.diff.PreOrderDiffWalk.BucketIndex;
 import org.locationtech.geogig.repository.IndexInfo;
-import org.locationtech.geogig.repository.NodeRef;
 import org.locationtech.geogig.repository.ProgressListener;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ObjectStore;
@@ -152,10 +152,8 @@ class MaterializedBuilderConsumer extends AbstractConsumer {
                 atts.put(attName, value.orNull());
             });
 
-            Map<String, Object> extraData = node.getExtraData();
-            if (extraData == null) {
-                extraData = new HashMap<>();
-            }
+            Map<String, Object> extraData = new HashMap<>(node.getExtraData());
+
             extraData.put(IndexInfo.FEATURE_ATTRIBUTES_EXTRA_DATA, atts);
 
             String name = node.getName();
