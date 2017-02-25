@@ -29,7 +29,7 @@ import org.geotools.feature.collection.DelegateFeatureIterator;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
-import org.locationtech.geogig.repository.NodeRef;
+import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.repository.ProgressListener;
 import org.locationtech.geogig.model.RevCommit;
