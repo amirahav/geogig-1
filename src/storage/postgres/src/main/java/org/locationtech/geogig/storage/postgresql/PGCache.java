@@ -74,13 +74,14 @@ public class PGCache {
     }
 
     public static PGCache build(ConfigDatabase configdb) {
-        Optional<Long> maxSize = configdb.get(Environment.KEY_ODB_BYTE_CACHE_MAX_SIZE, Long.class);
+        Optional<Long> maxSize = configdb.getGlobal(Environment.KEY_ODB_BYTE_CACHE_MAX_SIZE,
+                Long.class);
         Optional<Integer> concurrencyLevel = configdb
-                .get(Environment.KEY_ODB_BYTE_CACHE_CONCURRENCY_LEVEL, Integer.class);
+                .getGlobal(Environment.KEY_ODB_BYTE_CACHE_CONCURRENCY_LEVEL, Integer.class);
         Optional<Integer> expireSeconds = configdb
-                .get(Environment.KEY_ODB_BYTE_CACHE_EXPIRE_SECONDS, Integer.class);
+                .getGlobal(Environment.KEY_ODB_BYTE_CACHE_EXPIRE_SECONDS, Integer.class);
         Optional<Integer> initialCapacity = configdb
-                .get(Environment.KEY_ODB_BYTE_CACHE_INITIAL_CAPACITY, Integer.class);
+                .getGlobal(Environment.KEY_ODB_BYTE_CACHE_INITIAL_CAPACITY, Integer.class);
 
         Integer initialCapacityCount = initialCapacity.or(1_000_000);
         Integer concurrencyLevel2 = concurrencyLevel.or(16);
@@ -129,8 +130,8 @@ public class PGCache {
 
     private static long defaultCacheSize() {
         final long maxMemory = Runtime.getRuntime().maxMemory();
-        // Use up to 50% of the heap by default
-        return (long) (maxMemory * 0.5);
+        // Use up to 10% of the heap by default
+        return (long) (maxMemory * 0.1);
     }
 
     private Cache<ObjectId, byte[]> cache;
