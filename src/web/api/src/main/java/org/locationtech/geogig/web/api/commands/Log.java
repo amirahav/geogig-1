@@ -116,6 +116,9 @@ public class Log extends AbstractWebAPICommand {
     
     boolean zip = false;
 
+
+    boolean isAdmin = false;
+
     public Log(ParameterSet options) {
         super(options);
         setLimit(parseInt(options, "limit", null));
@@ -132,6 +135,7 @@ public class Log extends AbstractWebAPICommand {
         setReturnRange(Boolean.valueOf(options.getFirstValue("returnRange", "false")));
         setSummary(Boolean.valueOf(options.getFirstValue("summary", "false")));
         setZip(Boolean.valueOf(options.getFirstValue("zip", "false")));
+        setAdmin(Boolean.valueOf(options.getFirstValue("isAdmin", "false")));
     }
 
     @Override
@@ -255,6 +259,18 @@ public class Log extends AbstractWebAPICommand {
      */
     public void setZip(boolean zip) {
         this.zip = zip;
+    }
+
+
+    /**
+     * Mutator for the isAdmin variable
+     *
+     * @param isAdmin - if true, return unobfuscated username and email in log output
+     *
+     */
+
+    public void setAdmin(boolean admin) {
+        isAdmin = admin;
     }
 
     /**
@@ -467,11 +483,11 @@ public class Log extends AbstractWebAPICommand {
                         }
                         response += ",";
                         if (commit.getAuthor().getName().isPresent()) {
-                            response += escapeCsv(commit.getAuthor().getName().get());
+                            response += escapeCsv(anonymizeName(isAdmin,commit.getAuthor().getName().get()));
                         }
                         response += ",";
                         if (commit.getAuthor().getEmail().isPresent()) {
-                            response += escapeCsv(commit.getAuthor().getEmail().get());
+                            response += escapeCsv(anonymizeEmail(isAdmin,commit.getAuthor().getEmail().get()));
                         }
                         response += "," + new SimpleDateFormat("MM/dd/yyyy HH:mm:ss z")
                                 .format(new Date(commit.getAuthor().getTimestamp())) + ",";
@@ -543,6 +559,31 @@ public class Log extends AbstractWebAPICommand {
             throw new CommandSpecException("Couldn't resolve the given path to a feature type.");
         }
     }
+
+    private static String anonymizeEmail(Boolean isAdmin, String email){
+        if(isAdmin) {
+            return email;
+        }else{
+            return "";
+        }
+    }
+
+    private static String anonymizeName(Boolean isAdmin, String name){
+        if(isAdmin) {
+            return name;
+        }
+        if(name!=null){
+            String[] firstlast = name.split(" ");
+            if(firstlast.length>1){
+                return firstlast[0].substring(0,1)+firstlast[1];
+            }else{
+                return name;
+            }
+
+        }else{
+            return "";
+        }
+    }
     private void writeZIP(Repository geogig, OutputStream out, Iterator<RevCommit> log)
             throws Exception {
         Path temppath = null;
@@ -597,7 +638,7 @@ public class Log extends AbstractWebAPICommand {
 
                 Function<Feature, Optional<Feature>> function = getTransformingFunction(dataStore
                         .getSchema());
-                geogig.command(ExportBatchDiffOp.class).setFeatureStore(featureStore).setPath(path)
+                geogig.command(ExportBatchDiffOp.class).setFeatureStore(featureStore).setPath(path).setAdmin(isAdmin)
                         .setOldRefIterator(log).setTransactional(false)
                         .setFeatureTypeConversionFunction(function).call();
 

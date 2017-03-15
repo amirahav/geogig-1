@@ -83,6 +83,8 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
 
     private String path;
 
+    private static Boolean isAdmin = false;
+
     private Supplier<SimpleFeatureStore> targetStoreProvider;
 
     private Function<Feature, Optional<Feature>> function = IDENTITY;
@@ -194,9 +196,9 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                     featureBuilder.set(name, value);
                 }
                 featureBuilder.set(CHANGE_TYPE_NAME, input.changeType().name().charAt(0));
-                featureBuilder.set(CHANGE_AUTHOR_EMAIL, input.getCommitAuthorEmail().orNull());
-                featureBuilder.set(CHANGE_AUTHOR_NAME, input.getCommitAuthorName().orNull());
-                featureBuilder.set(CHANGE_AUTHOR_TIME, input.getCommitTime());
+                featureBuilder.set(CHANGE_AUTHOR_EMAIL, anonymizeEmail(isAdmin,input.getCommitAuthorEmail().orNull()));
+                featureBuilder.set(CHANGE_AUTHOR_NAME, anonymizeName(isAdmin, input.getCommitAuthorName().orNull()));
+                featureBuilder.set(CHANGE_AUTHOR_TIME,  input.getCommitTime());
                 Feature feature = featureBuilder.buildFeature(nodeRef.name());
                 feature.getUserData().put(Hints.USE_PROVIDED_FID, true);
                 feature.getUserData().put(RevFeature.class, revFeature);
@@ -216,6 +218,31 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 Predicates.notNull());
 
         return filterNulls;
+    }
+
+    private static String anonymizeEmail(Boolean isAdmin, String email){
+        if(isAdmin) {
+            return email;
+        }else{
+            return null;
+        }
+    }
+
+    private static String anonymizeName(Boolean isAdmin, String name){
+        if(isAdmin) {
+            return name;
+        }
+        if(name!=null){
+            String[] firstlast = name.split(" ");
+            if(firstlast.length>1){
+                return firstlast[0].substring(0,1)+firstlast[1];
+            }else{
+                return name;
+            }
+
+        }else{
+            return null;
+        }
     }
 
     private Iterator<DiffEntry> mergeDiffs() {
@@ -325,6 +352,11 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
      */
     public ExportBatchDiffOp setPath(String path) {
         this.path = path;
+        return this;
+    }
+
+    public ExportBatchDiffOp setAdmin(Boolean isAdmin){
+        this.isAdmin = isAdmin;
         return this;
     }
 
