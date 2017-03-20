@@ -427,7 +427,11 @@ public class Log extends AbstractWebAPICommand {
     }
 
     private void writeCSV(Repository geogig, Writer out, Iterator<RevCommit> log) throws Exception {
-        String response = "ChangeType,FeatureId,CommitId,Parent CommitIds,Author Name,Author Email,Author Commit Time,Committer Name,Committer Email,Committer Commit Time,Commit Message";
+        String response;
+        if(isAdmin)
+            response = "ChangeType,FeatureId,CommitId,Parent CommitIds,Author Name,Author Email,Author Commit Time,Committer Name,Committer Email,Committer Commit Time,Commit Message";
+        else
+            response = "ChangeType,FeatureId,CommitId,Parent CommitIds,Author Name,Author Commit Time,Committer Name,Committer Commit Time,Commit Message";
         out.write(response);
         response = "";
         String path = paths.get(0);
@@ -487,18 +491,25 @@ public class Log extends AbstractWebAPICommand {
                         }
                         response += ",";
                         if (commit.getAuthor().getEmail().isPresent()) {
-                            response += escapeCsv(anonymizeEmail(isAdmin,commit.getAuthor().getEmail().get()));
+                            if(isAdmin) {
+                                response += escapeCsv(commit.getAuthor().getEmail().get());
+                                response += ",";
+                            }
+                            //response += escapeCsv(anonymizeEmail(isAdmin,commit.getAuthor().getEmail().get()));
                         }
-                        response += "," + new SimpleDateFormat("MM/dd/yyyy HH:mm:ss z")
+                        response += new SimpleDateFormat("MM/dd/yyyy HH:mm:ss z")
                                 .format(new Date(commit.getAuthor().getTimestamp())) + ",";
                         if (commit.getCommitter().getName().isPresent()) {
-                            response += escapeCsv(commit.getCommitter().getName().get());
+                            response += escapeCsv(anonymizeName(isAdmin,commit.getCommitter().getName().get()));
                         }
                         response += ",";
                         if (commit.getCommitter().getEmail().isPresent()) {
-                            response += escapeCsv(commit.getCommitter().getEmail().get());
+                            if(isAdmin) {
+                                response += escapeCsv(commit.getCommitter().getEmail().get());
+                                response += ",";
+                            }
                         }
-                        response += "," + new SimpleDateFormat("MM/dd/yyyy HH:mm:ss z")
+                        response += new SimpleDateFormat("MM/dd/yyyy HH:mm:ss z")
                                 .format(new Date(commit.getCommitter().getTimestamp())) + ",";
                         String message = escapeCsv(commit.getMessage());
                         response += message;
@@ -575,7 +586,8 @@ public class Log extends AbstractWebAPICommand {
         if(name!=null){
             String[] firstlast = name.split(" ");
             if(firstlast.length>1){
-                return firstlast[0].substring(0,1)+firstlast[1];
+                //return firstlast[0].substring(0,1)+firstlast[1];
+                return firstlast[0];
             }else{
                 return name;
             }
@@ -617,7 +629,8 @@ public class Log extends AbstractWebAPICommand {
                 SimpleFeatureType outputFeatureType = (SimpleFeatureType) featureType.type();
                 SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
                 builder.add(ExportDiffOp.CHANGE_TYPE_NAME, String.class);
-                builder.add(ExportDiffOp.CHANGE_AUTHOR_EMAIL, String.class);
+                if(isAdmin)
+                    builder.add(ExportDiffOp.CHANGE_AUTHOR_EMAIL, String.class);
                 builder.add(ExportDiffOp.CHANGE_AUTHOR_NAME, String.class);
                 builder.add(ExportDiffOp.CHANGE_AUTHOR_TIME, String.class);
                 for (AttributeDescriptor descriptor : outputFeatureType.getAttributeDescriptors()) {

@@ -190,22 +190,30 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 }
                 final RevFeature revFeature = database.getFeature(nodeRef.getObjectId());
                 ImmutableList<Optional<Object>> values = revFeature.getValues();
+                int newattribcount = isAdmin ? 4 : 3;
                 for (int i = 0; i < values.size(); i++) {
-                    String name = featureType.getDescriptor(i + 4).getLocalName();
+                    String name = featureType.getDescriptor(i + newattribcount).getLocalName();
                     Object value = values.get(i).orNull();
+                   // System.out.println(name+':'+value);
                     featureBuilder.set(name, value);
                 }
                 featureBuilder.set(CHANGE_TYPE_NAME, input.changeType().name().charAt(0));
-                featureBuilder.set(CHANGE_AUTHOR_EMAIL, anonymizeEmail(isAdmin,input.getCommitAuthorEmail().orNull()));
+                if(isAdmin)
+                    featureBuilder.set(CHANGE_AUTHOR_EMAIL, input.getCommitAuthorEmail().orNull());
+                //featureBuilder.set(CHANGE_AUTHOR_EMAIL, anonymizeEmail(isAdmin,input.getCommitAuthorEmail().orNull()));
                 featureBuilder.set(CHANGE_AUTHOR_NAME, anonymizeName(isAdmin, input.getCommitAuthorName().orNull()));
                 featureBuilder.set(CHANGE_AUTHOR_TIME,  input.getCommitTime());
+              //  System.out.println(input.changeType().name().charAt(0)+input.getCommitAuthorName().orNull()+input.getCommitTime());
                 Feature feature = featureBuilder.buildFeature(nodeRef.name());
+              //  System.out.println("Feature built");
                 feature.getUserData().put(Hints.USE_PROVIDED_FID, true);
                 feature.getUserData().put(RevFeature.class, revFeature);
                 feature.getUserData().put(RevFeatureType.class, revFeatureType);
+             //   System.out.println(feature instanceof SimpleFeature);
 
                 if (feature instanceof SimpleFeature) {
-                    return (SimpleFeature) feature;
+                        return (SimpleFeature) feature;
+
                 }
                 return null;
             }
@@ -235,7 +243,8 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
         if(name!=null){
             String[] firstlast = name.split(" ");
             if(firstlast.length>1){
-                return firstlast[0].substring(0,1)+firstlast[1];
+                //return firstlast[0].substring(0,1)+firstlast[1];
+                return firstlast[0];
             }else{
                 return name;
             }
@@ -278,7 +287,8 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
         SimpleFeatureType featureType = (SimpleFeatureType) revFType.type();
         SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
         builder.add(CHANGE_TYPE_NAME, String.class);
-        builder.add(CHANGE_AUTHOR_EMAIL, String.class);
+        if(isAdmin)
+            builder.add(CHANGE_AUTHOR_EMAIL, String.class);
         builder.add(CHANGE_AUTHOR_NAME, String.class);
         builder.add(CHANGE_AUTHOR_TIME, String.class);
         for (AttributeDescriptor descriptor : featureType.getAttributeDescriptors()) {
