@@ -70,6 +70,9 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
     public static final String CHANGE_AUTHOR_EMAIL = "email";
     public static final String CHANGE_AUTHOR_NAME = "authorname";
     public static final String CHANGE_AUTHOR_TIME = "changetime";
+    public static final String CHANGE_COMMIT_NAME = "commitname";
+    public static final String CHANGE_COMMIT_EMAIL = "comitemail";
+
 
     private static final Function<Feature, Optional<Feature>> IDENTITY = new Function<Feature, Optional<Feature>>() {
 
@@ -190,7 +193,7 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 }
                 final RevFeature revFeature = database.getFeature(nodeRef.getObjectId());
                 ImmutableList<Optional<Object>> values = revFeature.getValues();
-                int newattribcount = isAdmin ? 4 : 3;
+                int newattribcount = isAdmin ? 6 : 3;
                 for (int i = 0; i < values.size(); i++) {
                     String name = featureType.getDescriptor(i + newattribcount).getLocalName();
                     Object value = values.get(i).orNull();
@@ -203,7 +206,11 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
                 //featureBuilder.set(CHANGE_AUTHOR_EMAIL, anonymizeEmail(isAdmin,input.getCommitAuthorEmail().orNull()));
                 featureBuilder.set(CHANGE_AUTHOR_NAME, anonymizeName(isAdmin, input.getCommitAuthorName().orNull()));
                 featureBuilder.set(CHANGE_AUTHOR_TIME,  input.getCommitTime());
-              //  System.out.println(input.changeType().name().charAt(0)+input.getCommitAuthorName().orNull()+input.getCommitTime());
+                if(isAdmin) {
+                    featureBuilder.set(CHANGE_COMMIT_EMAIL, input.getCommitEmail().orNull());
+                    featureBuilder.set(CHANGE_COMMIT_NAME, input.getCommitName().orNull());
+                }
+
                 Feature feature = featureBuilder.buildFeature(nodeRef.name());
               //  System.out.println("Feature built");
                 feature.getUserData().put(Hints.USE_PROVIDED_FID, true);
@@ -275,6 +282,8 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
             	diff.setCommitAuthorEmail(commit.getAuthor().getEmail());
             	diff.setCommitAuthorName(commit.getAuthor().getName());
             	diff.setCommitTime(new Date(commit.getAuthor().getTimestamp()).toString());
+            	diff.setCommitEmail(commit.getCommitter().getEmail());
+            	diff.setCommitName(commit.getCommitter().getName());
                 diffentries.add(diff);
             }
         }
@@ -291,6 +300,10 @@ public class ExportBatchDiffOp extends AbstractGeoGigOp<SimpleFeatureStore> {
             builder.add(CHANGE_AUTHOR_EMAIL, String.class);
         builder.add(CHANGE_AUTHOR_NAME, String.class);
         builder.add(CHANGE_AUTHOR_TIME, String.class);
+        if(isAdmin) {
+            builder.add(CHANGE_COMMIT_EMAIL, String.class);
+            builder.add(CHANGE_COMMIT_NAME, String.class);
+        }
         for (AttributeDescriptor descriptor : featureType.getAttributeDescriptors()) {
             builder.add(descriptor);
         }

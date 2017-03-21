@@ -82,11 +82,28 @@ public class DiffEntry {
     private Optional<String> commitAuthorName;
     
     private String commitTime;
-    
-    
 
-    
-	public Optional<String> getCommitAuthorEmail() {
+    private Optional<String> commitEmail;
+
+    private Optional<String> commitName;
+
+    public Optional<String> getCommitEmail() {
+        return commitEmail;
+    }
+
+    public void setCommitEmail(Optional<String> commitEmail) {
+        this.commitEmail = commitEmail;
+    }
+
+    public Optional<String> getCommitName() {
+        return commitName;
+    }
+
+    public void setCommitName(Optional<String> commitName) {
+        this.commitName = commitName;
+    }
+
+    public Optional<String> getCommitAuthorEmail() {
 		return commitAuthorEmail;
 	}
 

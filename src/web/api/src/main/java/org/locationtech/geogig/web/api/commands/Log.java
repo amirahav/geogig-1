@@ -431,7 +431,7 @@ public class Log extends AbstractWebAPICommand {
         if(isAdmin)
             response = "ChangeType,FeatureId,CommitId,Parent CommitIds,Author Name,Author Email,Author Commit Time,Committer Name,Committer Email,Committer Commit Time,Commit Message";
         else
-            response = "ChangeType,FeatureId,CommitId,Parent CommitIds,Author Name,Author Commit Time,Committer Name,Committer Commit Time,Commit Message";
+            response = "ChangeType,FeatureId,CommitId,Parent CommitIds,Author Name,Author Commit Time,Committer Commit Time,Commit Message";
         out.write(response);
         response = "";
         String path = paths.get(0);
@@ -500,9 +500,11 @@ public class Log extends AbstractWebAPICommand {
                         response += new SimpleDateFormat("MM/dd/yyyy HH:mm:ss z")
                                 .format(new Date(commit.getAuthor().getTimestamp())) + ",";
                         if (commit.getCommitter().getName().isPresent()) {
-                            response += escapeCsv(anonymizeName(isAdmin,commit.getCommitter().getName().get()));
+                            if(isAdmin) {
+                                response += escapeCsv(commit.getCommitter().getName().get());
+                                response += ",";
+                            }
                         }
-                        response += ",";
                         if (commit.getCommitter().getEmail().isPresent()) {
                             if(isAdmin) {
                                 response += escapeCsv(commit.getCommitter().getEmail().get());
@@ -633,6 +635,10 @@ public class Log extends AbstractWebAPICommand {
                     builder.add(ExportDiffOp.CHANGE_AUTHOR_EMAIL, String.class);
                 builder.add(ExportDiffOp.CHANGE_AUTHOR_NAME, String.class);
                 builder.add(ExportDiffOp.CHANGE_AUTHOR_TIME, String.class);
+                if(isAdmin) {
+                    builder.add(ExportDiffOp.CHANGE_COMMIT_EMAIL, String.class);
+                    builder.add(ExportDiffOp.CHANGE_COMMIT_NAME, String.class);
+                }
                 for (AttributeDescriptor descriptor : outputFeatureType.getAttributeDescriptors()) {
                     builder.add(descriptor);
                 }
