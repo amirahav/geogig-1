@@ -9,9 +9,6 @@
  */
 package org.locationtech.geogig.porcelain.index;
 
-import static org.locationtech.geogig.plumbing.index.QuadTreeTestSupport.createWorldPointsLayer;
-import static org.locationtech.geogig.plumbing.index.QuadTreeTestSupport.getPointFid;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +42,6 @@ public class UpdateIndexOpTest extends RepositoryTestCase {
 
     private Node worldPointsLayer;
 
-    private RevTree worldPointsTree;
-
     @Rule
     public ExpectedException exception = ExpectedException.none();
 
@@ -54,29 +49,27 @@ public class UpdateIndexOpTest extends RepositoryTestCase {
     protected void setUpInternal() throws Exception {
         Repository repository = getRepository();
         indexdb = repository.indexDatabase();
-        worldPointsLayer = createWorldPointsLayer(repository);
+        worldPointsLayer = IndexTestSupport.createWorldPointsLayer(repository).getNode();
         super.add();
         super.commit("created world points layer");
-        String fid1 = getPointFid(5, 10);
+        String fid1 = IndexTestSupport.getPointFid(5, 10);
         repository.command(RemoveOp.class)
                 .addPathToRemove(NodeRef.appendChild(worldPointsLayer.getName(), fid1)).call();
         repository.command(BranchCreateOp.class).setName("branch1").call();
         super.add();
         super.commit("deleted 5, 10");
-        String fid2 = getPointFid(35, -40);
+        String fid2 = IndexTestSupport.getPointFid(35, -40);
         repository.command(RemoveOp.class)
                 .addPathToRemove(NodeRef.appendChild(worldPointsLayer.getName(), fid2)).call();
         super.add();
         super.commit("deleted 35, -40");
         repository.command(CheckoutOp.class).setSource("branch1").call();
-        String fid3 = getPointFid(-10, 65);
+        String fid3 = IndexTestSupport.getPointFid(-10, 65);
         repository.command(RemoveOp.class)
                 .addPathToRemove(NodeRef.appendChild(worldPointsLayer.getName(), fid3)).call();
         super.add();
         super.commit("deleted -10, 65");
         repository.command(CheckoutOp.class).setSource("master").call();
-
-        this.worldPointsTree = repository.getTree(worldPointsLayer.getObjectId());
 
         assertNotEquals(RevTree.EMPTY_TREE_ID, worldPointsLayer.getObjectId());
     }
@@ -327,7 +320,7 @@ public class UpdateIndexOpTest extends RepositoryTestCase {
     @Test
     public void testUpdateNoExistingIndex() {
         exception.expect(IllegalStateException.class);
-        exception.expectMessage("No indexes could be found for the specified tree.");
+        exception.expectMessage("A matching index could not be found.");
         geogig.command(UpdateIndexOp.class)//
                 .setTreeRefSpec(worldPointsLayer.getName())//
                 .setExtraAttributes(Lists.newArrayList("y"))//
@@ -354,6 +347,22 @@ public class UpdateIndexOpTest extends RepositoryTestCase {
                 "Multiple indexes were found for the specified tree, please specify the attribute.");
         geogig.command(UpdateIndexOp.class)//
                 .setTreeRefSpec(worldPointsLayer.getName())//
+                .call();
+    }
+
+    @Test
+    public void testUpdateIndexNoTreeName() {
+        exception.expect(IllegalArgumentException.class);
+        exception.expectMessage("Tree ref spec not provided.");
+        geogig.command(UpdateIndexOp.class).call();
+    }
+
+    @Test
+    public void testUpdateIndexWrongTreeName() {
+        exception.expect(IllegalArgumentException.class);
+        exception.expectMessage("Can't find feature tree 'nonexistent'");
+        geogig.command(UpdateIndexOp.class)//
+                .setTreeRefSpec("nonexistent")//
                 .call();
     }
 
@@ -422,66 +431,6 @@ public class UpdateIndexOpTest extends RepositoryTestCase {
         assertTrue(indexedTreeId.isPresent());
 
         IndexTestSupport.verifyIndex(geogig, indexedTreeId.get(), canonicalFeatureTreeId, "x", "y");
-    }
-
-    @Test
-    public void testCreateIndexNoTreeName() {
-        exception.expect(IllegalArgumentException.class);
-        exception.expectMessage("treeName not provided");
-        geogig.command(CreateIndexOp.class)//
-                .setCanonicalTypeTree(worldPointsTree)//
-                .setFeatureTypeId(worldPointsLayer.getMetadataId().get())//
-                .setAttributeName("geom")//
-                .setIndexType(IndexType.QUADTREE)//
-                .call();
-    }
-
-    @Test
-    public void testCreateIndexNoCanonicalTypeTree() {
-        exception.expect(IllegalArgumentException.class);
-        exception.expectMessage("canonicalTypeTree not provided");
-        geogig.command(CreateIndexOp.class)//
-                .setTreeName(worldPointsLayer.getName())//
-                .setFeatureTypeId(worldPointsLayer.getMetadataId().get())//
-                .setAttributeName("geom")//
-                .setIndexType(IndexType.QUADTREE)//
-                .call();
-    }
-
-    @Test
-    public void testCreateIndexNoFeatureTypeId() {
-        exception.expect(IllegalArgumentException.class);
-        exception.expectMessage("featureTypeId not provided");
-        geogig.command(CreateIndexOp.class)//
-                .setTreeName(worldPointsLayer.getName())//
-                .setCanonicalTypeTree(worldPointsTree)//
-                .setAttributeName("geom")//
-                .setIndexType(IndexType.QUADTREE)//
-                .call();
-    }
-
-    @Test
-    public void testCreateIndexNoAttributeName() {
-        exception.expect(IllegalArgumentException.class);
-        exception.expectMessage("attributeName not provided");
-        geogig.command(CreateIndexOp.class)//
-                .setTreeName(worldPointsLayer.getName())//
-                .setCanonicalTypeTree(worldPointsTree)//
-                .setFeatureTypeId(worldPointsLayer.getMetadataId().get())//
-                .setIndexType(IndexType.QUADTREE)//
-                .call();
-    }
-
-    @Test
-    public void testCreateIndexNoIndexType() {
-        exception.expect(IllegalArgumentException.class);
-        exception.expectMessage("indexType not provided");
-        geogig.command(CreateIndexOp.class)//
-                .setTreeName(worldPointsLayer.getName())//
-                .setCanonicalTypeTree(worldPointsTree)//
-                .setFeatureTypeId(worldPointsLayer.getMetadataId().get())//
-                .setAttributeName("geom")//
-                .call();
     }
 
     @Test

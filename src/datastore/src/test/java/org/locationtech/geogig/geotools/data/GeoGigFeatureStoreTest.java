@@ -31,29 +31,34 @@ import org.locationtech.geogig.porcelain.BranchCreateOp;
 import org.locationtech.geogig.porcelain.CommitOp;
 import org.locationtech.geogig.porcelain.LogOp;
 import org.locationtech.geogig.test.integration.RepositoryTestCase;
+import org.opengis.feature.Feature;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.FeatureType;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.filter.Id;
 import org.opengis.filter.identity.FeatureId;
 import org.opengis.filter.identity.ResourceId;
 
+import com.vividsolutions.jts.geom.Geometry;
+
 public class GeoGigFeatureStoreTest extends RepositoryTestCase {
 
-    private static final FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
+    protected static final FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
 
     @Rule
     public ExpectedException expected = ExpectedException.none();
 
-    private GeoGigDataStore dataStore;
+    protected GeoGigDataStore dataStore;
 
-    private GeogigFeatureStore points;
+    protected GeogigFeatureStore points;
 
     @Override
     protected void setUpInternal() throws Exception {
         dataStore = new GeoGigDataStore(geogig.getRepository());
         dataStore.createSchema(super.pointsType);
         dataStore.createSchema(super.linesType);
+        dataStore.createSchema(super.polyType);
 
         points = (GeogigFeatureStore) dataStore.getFeatureSource(pointsName);
     }
@@ -302,8 +307,7 @@ public class GeoGigFeatureStoreTest extends RepositoryTestCase {
     @Test
     public void testRemoveFeatures() throws Exception {
         // add features circumventing FeatureStore.addFeatures to keep the test
-        // independent of the
-        // addFeatures functionality
+        // independent of the addFeatures functionality
         insertAndAdd(lines1, lines2, lines3);
         insertAndAdd(points1, points2, points3);
         geogig.command(CommitOp.class).call();
@@ -400,5 +404,59 @@ public class GeoGigFeatureStoreTest extends RepositoryTestCase {
         assertTrue(commits.get(0).getAuthor().getName().isPresent());
         assertEquals("John Doe", commits.get(0).getAuthor().getName().orNull());
         assertEquals("jd@example.com", commits.get(0).getAuthor().getEmail().orNull());
+    }
+
+    public @Test void testAddFeaturesWrongTypeName() throws Exception {
+
+        FeatureCollection<SimpleFeatureType, SimpleFeature> collection;
+        SimpleFeatureType newType = DataUtilities.createType("http://geogig.someType", "someType",
+                "sp:String,ip:Integer");
+
+        Feature newFeature = feature(newType, "someType.1", "StringProp1", new Integer(1000));
+
+        collection = DataUtilities.collection(Arrays.asList((SimpleFeature) points1,
+                (SimpleFeature) points2, (SimpleFeature) newFeature));
+
+        expected.expect(IOException.class);
+        expected.expectMessage("Tried to insert features of type 'someType' into 'Points'");
+        points.addFeatures(collection);
+    }
+
+    public @Test void testAddFeaturesSubType() throws Exception {
+
+        FeatureCollection<SimpleFeatureType, SimpleFeature> collection;
+        SimpleFeatureType subType = DataUtilities.createSubType(pointsType, new String[] { "ip" });
+
+        Feature newFeature = feature(subType, "subtype.1", new Integer(-1));
+        newFeature.getUserData().put(Hints.USE_PROVIDED_FID, Boolean.TRUE);
+
+        collection = DataUtilities.collection(Arrays.asList((SimpleFeature) points1,
+                (SimpleFeature) points2, (SimpleFeature) newFeature));
+        List<FeatureId> addFeatures = points.addFeatures(collection);
+        assertEquals(3, addFeatures.size());
+
+        assertEquals("subtype.1", addFeatures.get(2).getID());
+    }
+
+    public @Test void testAddFeaturesWrongAttributeType() throws Exception {
+
+        final FeatureType original = pointsType;
+        final String typeSpec = pointsTypeSpec + ",notInOriginalProp:String";
+
+        FeatureCollection<SimpleFeatureType, SimpleFeature> collection;
+
+        final SimpleFeatureType newType = DataUtilities.createType(
+                original.getName().getNamespaceURI(), original.getName().getLocalPart(), typeSpec);
+
+        Feature newFeature = feature(newType, "someid", "StringProp1", new Integer(1000),
+                (Geometry) null, "value of att not in target schema");
+
+        collection = DataUtilities.collection(Arrays.asList((SimpleFeature) points1,
+                (SimpleFeature) points2, (SimpleFeature) newFeature));
+
+        expected.expect(IOException.class);
+        expected.expectMessage("No such attribute:notInOriginalProp");
+        points.addFeatures(collection);
+
     }
 }

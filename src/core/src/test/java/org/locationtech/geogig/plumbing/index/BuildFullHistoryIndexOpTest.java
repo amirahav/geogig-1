@@ -9,11 +9,13 @@
  */
 package org.locationtech.geogig.plumbing.index;
 
-import static org.locationtech.geogig.plumbing.index.QuadTreeTestSupport.createWorldPointsLayer;
-import static org.locationtech.geogig.plumbing.index.QuadTreeTestSupport.getPointFid;
-
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.Rule;
@@ -51,22 +53,22 @@ public class BuildFullHistoryIndexOpTest extends RepositoryTestCase {
     protected void setUpInternal() throws Exception {
         Repository repository = getRepository();
         indexdb = repository.indexDatabase();
-        worldPointsLayer = createWorldPointsLayer(repository);
+        worldPointsLayer = IndexTestSupport.createWorldPointsLayer(repository).getNode();
         super.add();
         super.commit("created world points layer");
-        String fid1 = getPointFid(5, 10);
+        String fid1 = IndexTestSupport.getPointFid(5, 10);
         repository.command(RemoveOp.class)
                 .addPathToRemove(NodeRef.appendChild(worldPointsLayer.getName(), fid1)).call();
         repository.command(BranchCreateOp.class).setName("branch1").call();
         super.add();
         super.commit("deleted 5, 10");
-        String fid2 = getPointFid(35, -40);
+        String fid2 = IndexTestSupport.getPointFid(35, -40);
         repository.command(RemoveOp.class)
                 .addPathToRemove(NodeRef.appendChild(worldPointsLayer.getName(), fid2)).call();
         super.add();
         super.commit("deleted 35, -40");
         repository.command(CheckoutOp.class).setSource("branch1").call();
-        String fid3 = getPointFid(-10, 65);
+        String fid3 = IndexTestSupport.getPointFid(-10, 65);
         repository.command(RemoveOp.class)
                 .addPathToRemove(NodeRef.appendChild(worldPointsLayer.getName(), fid3)).call();
         super.add();
@@ -176,14 +178,14 @@ public class BuildFullHistoryIndexOpTest extends RepositoryTestCase {
         indexInfo = createIndex();
 
         exception.expect(IllegalArgumentException.class);
-        exception.expectMessage("treeRefSpec not provided");
+        exception.expectMessage("Tree ref spec not provided");
         geogig.command(BuildFullHistoryIndexOp.class).call();
     }
 
     @Test
     public void testBuildFullHistoryNoIndex() {
         exception.expect(IllegalStateException.class);
-        exception.expectMessage("No indexes could be found for the specified tree.");
+        exception.expectMessage("A matching index could not be found.");
         geogig.command(BuildFullHistoryIndexOp.class)//
                 .setTreeRefSpec(worldPointsLayer.getName())//
                 .call();
@@ -211,4 +213,63 @@ public class BuildFullHistoryIndexOpTest extends RepositoryTestCase {
                 .setTreeRefSpec(worldPointsLayer.getName())//
                 .call();
     }
+
+    @Test
+    public void testConcurrentlyBuildingSameIndex() throws Exception {
+        indexInfo = createIndex();
+        final int threadCount = 4;
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        List<Future<?>> futures = new ArrayList<>();
+        for (int t = 0; t < threadCount; t++) {
+            Future<?> future = executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    geogig.command(BuildFullHistoryIndexOp.class)//
+                            .setTreeRefSpec(indexInfo.getTreeName())//
+                            .setAttributeName(indexInfo.getAttributeName())//
+                            .call();
+
+                    ObjectId canonicalFeatureTreeId = geogig.command(ResolveTreeish.class)
+                            .setTreeish("HEAD:" + worldPointsLayer.getName()).call().get();
+                    Optional<ObjectId> indexedTreeId = indexdb.resolveIndexedTree(indexInfo,
+                            canonicalFeatureTreeId);
+                    assertTrue(indexedTreeId.isPresent());
+
+                    IndexTestSupport.verifyIndex(geogig, indexedTreeId.get(),
+                            canonicalFeatureTreeId);
+
+                    canonicalFeatureTreeId = geogig.command(ResolveTreeish.class)
+                            .setTreeish("HEAD~1:" + worldPointsLayer.getName()).call().get();
+                    indexedTreeId = indexdb.resolveIndexedTree(indexInfo, canonicalFeatureTreeId);
+                    assertTrue(indexedTreeId.isPresent());
+
+                    IndexTestSupport.verifyIndex(geogig, indexedTreeId.get(),
+                            canonicalFeatureTreeId);
+
+                    canonicalFeatureTreeId = geogig.command(ResolveTreeish.class)
+                            .setTreeish("HEAD~2:" + worldPointsLayer.getName()).call().get();
+                    indexedTreeId = indexdb.resolveIndexedTree(indexInfo, canonicalFeatureTreeId);
+                    assertTrue(indexedTreeId.isPresent());
+
+                    IndexTestSupport.verifyIndex(geogig, indexedTreeId.get(),
+                            canonicalFeatureTreeId);
+
+                    canonicalFeatureTreeId = geogig.command(ResolveTreeish.class)
+                            .setTreeish("branch1:" + worldPointsLayer.getName()).call().get();
+                    indexedTreeId = indexdb.resolveIndexedTree(indexInfo, canonicalFeatureTreeId);
+                    assertTrue(indexedTreeId.isPresent());
+
+                    IndexTestSupport.verifyIndex(geogig, indexedTreeId.get(),
+                            canonicalFeatureTreeId);
+                }
+            });
+            futures.add(future);
+        }
+
+        for (Future<?> f : futures) {
+            f.get();
+        }
+    }
+
 }

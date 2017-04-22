@@ -11,34 +11,46 @@ package org.locationtech.geogig.geotools.data.reader;
 
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import java.util.*;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jdt.annotation.Nullable;
-import org.geotools.data.DataUtilities;
 import org.geotools.data.FeatureReader;
 import org.geotools.data.Query;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.Hints;
-import org.geotools.filter.text.cql2.CQLException;
-import org.geotools.filter.text.ecql.ECQL;
+import org.geotools.feature.NameImpl;
+import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.renderer.ScreenMap;
 import org.junit.After;
 import org.junit.Test;
 import org.locationtech.geogig.model.Bounded;
 import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.model.RevFeatureType;
+import org.locationtech.geogig.model.impl.RevFeatureTypeBuilder;
 import org.locationtech.geogig.plumbing.DiffTree;
 import org.locationtech.geogig.porcelain.index.CreateQuadTree;
 import org.locationtech.geogig.porcelain.index.Index;
 import org.locationtech.geogig.repository.Context;
+import org.locationtech.geogig.repository.DiffEntry;
+import org.locationtech.geogig.storage.AutoCloseableIterator;
 import org.locationtech.geogig.test.integration.RepositoryTestCase;
+import org.mockito.Mockito;
 import org.opengis.feature.Feature;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
+import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.filter.PropertyIsEqualTo;
@@ -46,6 +58,7 @@ import org.opengis.filter.PropertyIsNotEqualTo;
 import org.opengis.filter.identity.FeatureId;
 import org.opengis.filter.sort.SortBy;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
@@ -65,6 +78,7 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
     // reader resulting from calling builder.build()
     private FeatureReader<SimpleFeatureType, SimpleFeature> reader;
 
+    // spy'ed DiffTree command
     private DiffTree difftree;
 
     /**
@@ -105,6 +119,7 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
         commit("inital");
 
         SimpleFeatureType fullSchema = pointsType;
+        RevFeatureType nativeType = RevFeatureTypeBuilder.build(fullSchema);
         Context actualContext = repo.context();
         context = spy(actualContext);
 
@@ -113,7 +128,7 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
 
         NodeRef typeRef = context.workingTree().getFeatureTypeTrees().get(0);
 
-        FeatureReaderBuilder b = FeatureReaderBuilder.builder(context, fullSchema, typeRef);
+        FeatureReaderBuilder b = FeatureReaderBuilder.builder(context, nativeType, typeRef);
         builder = spy(b);
     }
 
@@ -174,6 +189,56 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
     }
 
     @Test
+    public void testResultingSchemaExplicitTargetSchema() throws Exception {
+        // as per ContentFeatureSource, the full schema may be a subset to start with, or it may
+        // just have the namespace changed
+        NameImpl namespaceRename = new NameImpl("http://geogig.org/testNamespace", pointsName);
+        NameImpl localNameRename = new NameImpl("PointsRenamed");
+        NameImpl namespaceAndLocalNameRename = new NameImpl("http://geogig.org/testNamespace",
+                "PointsRenamed");
+
+        testResultingSchemaExplicitTargetSchema(namespaceRename);
+        testResultingSchemaExplicitTargetSchema(localNameRename);
+        testResultingSchemaExplicitTargetSchema(namespaceAndLocalNameRename);
+
+        testResultingSchemaExplicitTargetSchema(namespaceRename, "sp", "ip");
+        testResultingSchemaExplicitTargetSchema(localNameRename, "ip", "sp");
+        testResultingSchemaExplicitTargetSchema(namespaceAndLocalNameRename, "pp", "sp");
+    }
+
+    public void testResultingSchemaExplicitTargetSchema(Name targetName,
+            @Nullable String... propertySubset) throws Exception {
+
+        SimpleFeatureType redefinedFullSchema;
+        {
+            SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
+            builder.setName(targetName);
+            if (propertySubset == null || propertySubset.length == 0) {
+                builder.addAll(pointsType.getAttributeDescriptors());
+            } else {
+                for (String att : propertySubset) {
+                    AttributeDescriptor descriptor = pointsType.getDescriptor(att);
+                    Preconditions.checkArgument(descriptor != null);
+                    builder.add(descriptor);
+                }
+            }
+            redefinedFullSchema = builder.buildFeatureType();
+        }
+
+        builder.targetSchema(redefinedFullSchema);
+        FeatureReader<SimpleFeatureType, SimpleFeature> reader = builder.build();
+        assertEquals(redefinedFullSchema, reader.getFeatureType());
+        SimpleFeature f = reader.next();
+        assertNotNull(f);
+        assertEquals(redefinedFullSchema, f.getType());
+    }
+
+    private void assertEquals(SimpleFeatureType expected, SimpleFeatureType actual) {
+        assertEquals(expected.getName(), actual.getName());
+        assertEquals(expected.getAttributeDescriptors(), actual.getAttributeDescriptors());
+    }
+
+    @Test
     public void testResultingSchemaEmptySchema() {
         FeatureReader<SimpleFeatureType, SimpleFeature> reader = getReader(Query.FIDS);
         assertEquals(0, reader.getFeatureType().getAttributeCount());
@@ -190,9 +255,6 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
 
         assertEquals(1, reader.getFeatureType().getAttributeCount());
         assertEquals("ip", reader.getFeatureType().getDescriptor(0).getLocalName());
-
-        assertTrue(reader instanceof FeatureReaderAdapter);
-        assertEquals(3, Iterators.size(((FeatureReaderAdapter) reader).iterator));
     }
 
     @Test
@@ -211,8 +273,7 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
         List<String> resultatts = Lists.transform(resultType.getAttributeDescriptors(),
                 (d) -> d.getLocalName());
 
-        assertEquals(2, resultatts.size());
-        assertTrue(resultatts.contains("sp"));
+        assertEquals(1, resultatts.size());
         assertTrue(resultatts.contains("ip"));
     }
 
@@ -273,19 +334,58 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
 
         PropertyIsNotEqualTo unsupported = ff.notEqual(ff.property("sp"),
                 ff.literal("StringProp1_1"));
-        
+
         PropertyIsEqualTo supported = ff.equals(ff.property("ip"),
                 ff.literal(Integer.valueOf(2000)));
 
         Filter filter = ff.and(unsupported, supported);
 
-        Predicate<Bounded> preFilter = builder.createIndexPreFilter(filter, ImmutableSet.of("ip"), true);
+        PrePostFilterSplitter filterSplitter = new PrePostFilterSplitter()
+                .extraAttributes(ImmutableSet.of("ip")).filter(filter).build();
+
+        Predicate<Bounded> preFilter = PreFilter.forFilter(filterSplitter.getPreFilter());
         assertTrue(preFilter instanceof PreFilter);
-        assertEquals(supported, ((PreFilter)preFilter).filter);
-        
+        assertEquals(supported, ((PreFilter) preFilter).filter);
+
         query.setFilter(filter);
         verifyFeatures(query, points2);
         verifyUsesIndex(index);
+    }
+
+    public @Test void testDiffTreeIteratorIsClosedOnError() throws IOException {
+        RuntimeException expected = new RuntimeException();
+        AutoCloseableIterator<DiffEntry> mockIt = mock(AutoCloseableIterator.class);
+        when(mockIt.hasNext()).thenReturn(true);
+        when(mockIt.next()).thenThrow(expected);
+        doReturn(mockIt).when(difftree).call();
+
+        FeatureReader<SimpleFeatureType, SimpleFeature> featureReader = builder.build();
+        assertNotNull(featureReader);
+        try {
+            featureReader.hasNext();
+            featureReader.next();
+            fail("Expected RuntimeException");
+        } catch (RuntimeException e) {
+            assertTrue(true);
+        }
+        Mockito.verify(mockIt, times(1)).close();
+    }
+
+    public @Test void testDiffTreeIteratorIsClosedOnPrematureFeatureIteratorClose()
+            throws IOException {
+
+        AutoCloseableIterator<DiffEntry> mockIt = mock(AutoCloseableIterator.class);
+        when(mockIt.hasNext()).thenReturn(true);
+        when(mockIt.next()).thenReturn(mock(DiffEntry.class));
+        doReturn(mockIt).when(difftree).call();
+
+        FeatureReader<SimpleFeatureType, SimpleFeature> featureReader = builder.build();
+        // close the feature reader before being fully consumed
+        featureReader.close();
+
+        Mockito.verify(mockIt, times(0)).hasNext();
+        Mockito.verify(mockIt, times(0)).next();
+        Mockito.verify(mockIt, times(1)).close();
     }
 
     private Map<FeatureId, SimpleFeature> verifyFeatures(Query query, Feature... expectedFeatures)
@@ -341,96 +441,4 @@ public class FeatureReaderBuilderTest extends RepositoryTestCase {
 
         return actualMap;
     }
-
-    @Test
-    public void testIndexFullySupported() throws CQLException {
-        Set<String> indexExtraProperties = new HashSet<>();
-        indexExtraProperties.add("time");
-        indexExtraProperties.add("extraattribute");
-
-        Filter filter = ECQL.toFilter("BBOX(geom, 1,1,2,3)");
-        Set  filterProperties = new HashSet(Lists.newArrayList(DataUtilities.attributeNames(filter)));
-        boolean fullySupported = FeatureReaderBuilder.filterIsFullySupported(filter, indexExtraProperties, filterProperties);
-        assertTrue(fullySupported);
-
-        filter = ECQL.toFilter("time=3 AND BBOX(geom, 1,1,2,3)");
-        filterProperties = new HashSet(Lists.newArrayList(DataUtilities.attributeNames(filter)));
-        fullySupported = FeatureReaderBuilder.filterIsFullySupported(filter, indexExtraProperties, filterProperties);
-        assertTrue(fullySupported);
-
-        filter = ECQL.toFilter("time=3 AND extraattribute<3 AND BBOX(geom, 1,1,2,3)");
-        filterProperties = new HashSet(Lists.newArrayList(DataUtilities.attributeNames(filter)));
-        fullySupported = FeatureReaderBuilder.filterIsFullySupported(filter, indexExtraProperties, filterProperties);
-        assertTrue(fullySupported);
-
-        filter = ECQL.toFilter("time=3 AND extraattribute<3 AND unknownAtt=666 AND BBOX(geom, 1,1,2,3)");
-        filterProperties = new HashSet(Lists.newArrayList(DataUtilities.attributeNames(filter)));
-        fullySupported = FeatureReaderBuilder.filterIsFullySupported(filter, indexExtraProperties, filterProperties);
-        assertFalse(fullySupported);
-
-        filter = ECQL.toFilter("OVERLAPS(ENVELOPE(1,2,3,5),geom)");
-        filterProperties = new HashSet(Lists.newArrayList(DataUtilities.attributeNames(filter)));
-        fullySupported = FeatureReaderBuilder.filterIsFullySupported(filter, indexExtraProperties, filterProperties);
-        assertFalse(fullySupported);
-
-        filter = ECQL.toFilter("time=3 AND extraattribute<3 AND OVERLAPS(geom, POLYGON ((1 5, 1 3, 2 3, 2 5, 1 5)))");
-        filterProperties = new HashSet(Lists.newArrayList(DataUtilities.attributeNames(filter)));
-        fullySupported = FeatureReaderBuilder.filterIsFullySupported(filter, indexExtraProperties, filterProperties);
-        assertFalse(fullySupported);
-    }
-
-    @Test
-    public void testVerifySimpleBBoxUsage() throws CQLException {
-        //simpliest case
-        Filter f = ECQL.toFilter("BBOX(geom, 1,1,2,3) ");
-        FeatureReaderBuilder.VerifySimpleBBoxUsage visitor = new FeatureReaderBuilder.VerifySimpleBBoxUsage("geom");
-        f.accept(visitor, null);
-        assertTrue(visitor.isUsedInGeometryExpression);
-        assertTrue(visitor.isUsedInBBoxExpression);
-        assertTrue(visitor.isSimple());
-
-        //its not used
-        f = ECQL.toFilter("BBOX(geom2, 1,1,2,3) ");
-        visitor = new FeatureReaderBuilder.VerifySimpleBBoxUsage("geom");
-        f.accept(visitor, null);
-        assertFalse(visitor.isUsedInGeometryExpression);
-        assertFalse(visitor.isSimple());
-
-        //not a BBOX op
-        f = ECQL.toFilter("OVERLAPS(ENVELOPE(1,2,3,5),geom) ");
-        visitor = new FeatureReaderBuilder.VerifySimpleBBoxUsage("geom");
-        f.accept(visitor, null);
-        assertTrue(visitor.isUsedInGeometryExpression);
-        assertTrue(visitor.isUsedInNonBBoxExpression);
-        assertFalse(visitor.isSimple());
-
-        //bad AND good = bad
-        f = ECQL.toFilter("OVERLAPS(ENVELOPE(1,2,3,5),geom) AND BBOX(geom, 1,1,2,3)");
-        visitor = new FeatureReaderBuilder.VerifySimpleBBoxUsage("geom");
-        f.accept(visitor, null);
-        assertTrue(visitor.isUsedInGeometryExpression);
-        assertTrue(visitor.isUsedInNonBBoxExpression);
-        assertTrue(visitor.isUsedInBBoxExpression);
-        assertFalse(visitor.isSimple());
-
-        //not correct type
-        f = ECQL.toFilter("geom=5");
-        visitor = new FeatureReaderBuilder.VerifySimpleBBoxUsage("geom");
-        f.accept(visitor, null);
-        assertFalse(visitor.isUsedInGeometryExpression);
-        assertFalse(visitor.isUsedInNonBBoxExpression);
-        assertFalse(visitor.isUsedInBBoxExpression);
-        assertFalse(visitor.isSimple());
-
-        //irrelevant AND good = good
-        f = ECQL.toFilter("time=3 AND BBOX(geom, 1,1,2,3)");
-        visitor = new FeatureReaderBuilder.VerifySimpleBBoxUsage("geom");
-        f.accept(visitor, null);
-        assertTrue(visitor.isUsedInGeometryExpression);
-        assertFalse(visitor.isUsedInNonBBoxExpression);
-        assertTrue(visitor.isUsedInBBoxExpression);
-        assertTrue(visitor.isSimple());
-    }
-
-
 }

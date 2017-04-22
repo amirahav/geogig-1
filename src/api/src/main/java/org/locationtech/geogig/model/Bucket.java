@@ -9,16 +9,19 @@
  */
 package org.locationtech.geogig.model;
 
+import static com.google.common.base.Optional.fromNullable;
+
 import org.eclipse.jdt.annotation.Nullable;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.vividsolutions.jts.geom.Envelope;
 
 /**
  * A Bucket is merely a bounded pointer to another tree in a {@link RevTree} data structure.
  * <p>
- * {@link Node}s are pointers to named objects such as feature trees or features, while a Bucket is a
- * pointer to the {@link RevTree}s it's parent tree is split into when the builder's imposed split
+ * {@link Node}s are pointers to named objects such as feature trees or features, while a Bucket is
+ * a pointer to the {@link RevTree}s it's parent tree is split into when the builder's imposed split
  * threshold is surpassed.
  * 
  * @see RevTree#buckets()
@@ -26,27 +29,17 @@ import com.vividsolutions.jts.geom.Envelope;
  */
 public abstract class Bucket implements Bounded {
 
-    private final ObjectId bucketTree;
-
-    private Bucket(ObjectId id) {
-        this.bucketTree = id;
+    public static Bucket create(final ObjectId bucketTree, final @Nullable Envelope bounds) {
+        Preconditions.checkNotNull(bucketTree);
+        Float32Bounds b32 = Float32Bounds.valueOf(bounds);
+        return new BucketImpl(bucketTree, b32);
     }
 
     /**
      * @return the {@link ObjectId} of the tree this bucket points to
      */
     @Override
-    public ObjectId getObjectId() {
-        return bucketTree;
-    }
-
-    @Override
-    public String toString() {
-        Envelope bounds = new Envelope();
-        expand(bounds);
-        return getClass().getSimpleName() + "[" + getObjectId() + "] "
-                + (bounds.isNull() ? "" : bounds.toString());
-    }
+    public abstract ObjectId getObjectId();
 
     /**
      * Equality check based purely on {@link #getObjectId() ObjectId}
@@ -59,88 +52,41 @@ public abstract class Bucket implements Bounded {
         return getObjectId().equals(((Bucket) o).getObjectId());
     }
 
-    private static class PointBucket extends Bucket {
+    private static class BucketImpl extends Bucket {
+        private final ObjectId bucketTree;
 
-        private final double x;
+        private final Float32Bounds bounds;
 
-        private final double y;
+        private BucketImpl(ObjectId id, Float32Bounds bounds) {
+            this.bucketTree = id;
+            this.bounds = bounds;
+        }
 
-        public PointBucket(ObjectId id, double x, double y) {
-            super(id);
-            this.x = x;
-            this.y = y;
+        @Override
+        public ObjectId getObjectId() {
+            return bucketTree;
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "[" + getObjectId() + "] "
+                    + (bounds.isNull() ? "" : bounds.toString());
         }
 
         @Override
         public boolean intersects(Envelope env) {
-            return env.intersects(x, y);
+            return bounds.intersects(env);
         }
 
         @Override
         public void expand(Envelope env) {
-            env.expandToInclude(x, y);
+            bounds.expand(env);
         }
 
         @Override
         public Optional<Envelope> bounds() {
-            return Optional.of(new Envelope(x, x, y, y));
-        }
-    }
-
-    private static class RectangleBucket extends Bucket {
-
-        private Envelope bucketBounds;
-
-        public RectangleBucket(ObjectId id, Envelope env) {
-            super(id);
-            this.bucketBounds = env;
+            return fromNullable(bounds.isNull() ? null : bounds.asEnvelope());
         }
 
-        @Override
-        public boolean intersects(Envelope env) {
-            return env.intersects(this.bucketBounds);
-        }
-
-        @Override
-        public void expand(Envelope env) {
-            env.expandToInclude(this.bucketBounds);
-        }
-
-        @Override
-        public Optional<Envelope> bounds() {
-            return Optional.of(new Envelope(bucketBounds));
-        }
-    }
-
-    private static class NonSpatialBucket extends Bucket {
-
-        public NonSpatialBucket(ObjectId id) {
-            super(id);
-        }
-
-        @Override
-        public boolean intersects(Envelope env) {
-            return false;
-        }
-
-        @Override
-        public void expand(Envelope env) {
-            // nothing to do
-        }
-
-        @Override
-        public Optional<Envelope> bounds() {
-            return Optional.absent();
-        }
-    }
-
-    public static Bucket create(final ObjectId bucketTree, final @Nullable Envelope bounds) {
-        if (bounds == null || bounds.isNull()) {
-            return new NonSpatialBucket(bucketTree);
-        }
-        if (bounds.getWidth() == 0D && bounds.getHeight() == 0D) {
-            return new PointBucket(bucketTree, bounds.getMinX(), bounds.getMinY());
-        }
-        return new RectangleBucket(bucketTree, new Envelope(bounds));
     }
 }

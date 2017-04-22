@@ -9,6 +9,7 @@
  */
 package org.locationtech.geogig.plumbing.index;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterators.singletonIterator;
 
 import java.util.ArrayList;
@@ -39,7 +40,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
-import com.google.common.collect.Maps;
 import com.vividsolutions.jts.geom.Envelope;
 
 class MaterializedBuilderConsumer extends AbstractConsumer {
@@ -57,12 +57,12 @@ class MaterializedBuilderConsumer extends AbstractConsumer {
         @Override
         public Iterator<Node> iterator() {
             return left == null ? singletonIterator(right)
-                    : (right == null ? singletonIterator(left)
-                            : Iterators.forArray(left, right));
+                    : (right == null ? singletonIterator(left) : Iterators.forArray(left, right));
         }
     }
 
-    private BlockingQueue<MaterializedBuilderConsumer.Tuple> nodes = new ArrayBlockingQueue<>(batchSize);
+    private BlockingQueue<MaterializedBuilderConsumer.Tuple> nodes = new ArrayBlockingQueue<>(
+            batchSize);
 
     final AtomicLong count = new AtomicLong();
 
@@ -115,13 +115,13 @@ class MaterializedBuilderConsumer extends AbstractConsumer {
         List<MaterializedBuilderConsumer.Tuple> list = new ArrayList<>(batchSize);
         nodes.drainTo(list);
 
-        final Map<ObjectId, RevFeature> objects;
+        final Map<ObjectId, RevFeature> objects = new HashMap<>();
         {
             Iterable<Node> allNodes = Iterables.concat(list);
             Iterable<ObjectId> nodeIds = Iterables.transform(allNodes, (n) -> n.getObjectId());
             Iterator<RevFeature> objectsIt = featureSource.getAll(nodeIds,
                     BulkOpListener.NOOP_LISTENER, RevFeature.class);
-            objects = Maps.uniqueIndex(objectsIt, (o) -> o.getId());
+            objectsIt.forEachRemaining((o) -> objects.put(o.getId(), o));
         }
 
         for (MaterializedBuilderConsumer.Tuple t : list) {
@@ -130,11 +130,27 @@ class MaterializedBuilderConsumer extends AbstractConsumer {
             @Nullable
             Node right = materialize(t.right, objects);
             if (left == null) {
-                builder.put(right);
+                // if (!right.getExtraData().isEmpty()) {
+                // System.err.printf(">>>> PUT: %s (%s)\n", right.getName(), right.getExtraData());
+                // }
+                boolean put = builder.put(right);
+                checkState(put, "Node was not added to index: %s", right);
             } else if (right == null) {
-                builder.remove(left);
+                // if (!left.getExtraData().isEmpty()) {
+                // System.err.printf("<<<< REMOVE: %s (%s)\n", left.getName(),
+                // left.getExtraData());
+                // }
+                boolean removed = builder.remove(left);
+                checkState(removed, "Node was not removed from index: %s", left);
             } else {
-                builder.update(left, right);
+                // if (!right.getExtraData().isEmpty() || !left.getExtraData().isEmpty()) {
+                // System.err.printf("<<>>> UPDATE: %s (%s)->(%s)\n", right.getName(),
+                // left.getExtraData(), right.getExtraData());
+                // }
+                boolean updated = builder.update(left, right);
+                if (!left.equals(right)) {
+                    checkState(updated, "Node %s was not updated to %s", left, right);
+                }
             }
         }
     }

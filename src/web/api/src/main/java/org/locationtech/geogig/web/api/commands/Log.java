@@ -119,8 +119,8 @@ public class Log extends AbstractWebAPICommand {
 
     boolean isAdmin = false;
 
-    public Log(ParameterSet options) {
-        super(options);
+    @Override
+    protected void setParametersInternal(ParameterSet options) {
         setLimit(parseInt(options, "limit", null));
         setOffset(parseInt(options, "offset", null));
         setPaths(Arrays.asList(options.getValuesArray("path")));

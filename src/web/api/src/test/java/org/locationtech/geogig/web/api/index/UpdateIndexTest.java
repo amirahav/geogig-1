@@ -27,27 +27,19 @@ import org.locationtech.geogig.repository.IndexInfo;
 import org.locationtech.geogig.repository.IndexInfo.IndexType;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.web.api.AbstractWebAPICommand;
-import org.locationtech.geogig.web.api.AbstractWebOpTest;
 import org.locationtech.geogig.web.api.ParameterSet;
 import org.locationtech.geogig.web.api.TestData;
 import org.locationtech.geogig.web.api.TestParams;
-import org.locationtech.geogig.web.api.WebAPICommand;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.vividsolutions.jts.geom.Envelope;
 
-public class UpdateIndexTest extends AbstractWebOpTest {
+public class UpdateIndexTest extends AbstractIndexWebOpTest {
 
     @Override
     protected String getRoute() {
         return "update";
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    protected <T extends WebAPICommand> T buildCommand(ParameterSet options) {
-        return (T) IndexCommandBuilder.build(getRoute(), options);
     }
 
     @Override
@@ -275,7 +267,7 @@ public class UpdateIndexTest extends AbstractWebOpTest {
         ParameterSet options = TestParams.of("treeRefSpec", "Points", "extraAttributes", "ip");
 
         ex.expect(IllegalStateException.class);
-        ex.expectMessage("No indexes could be found for the specified tree.");
+        ex.expectMessage("A matching index could not be found.");
         buildCommand(options).run(testContext.get());
     }
 

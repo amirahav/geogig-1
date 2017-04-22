@@ -9,6 +9,7 @@
  */
 package org.locationtech.geogig.model;
 
+import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.Map;
@@ -118,23 +119,25 @@ public abstract class Node implements Bounded, Comparable<Node> {
         /**
          * The name of the element
          */
-        private String name;
+        private final String name;
 
         /**
          * Optional ID corresponding to metadata for the element
          */
         @Nullable
-        private ObjectId metadataId;
+        private final ObjectId metadataId;
 
         /**
          * Id of the object this ref points to
          */
-        private ObjectId objectId;
+        private final ObjectId objectId;
 
-        private ImmutableMap<String, Object> extraData;
+        private final ImmutableMap<String, Object> extraData;
+
+        private final Float32Bounds bounds;
 
         private BaseNode(final String name, final ObjectId oid, final ObjectId metadataId,
-                Map<String, Object> extraData) {
+                @Nullable Envelope bounds, @Nullable Map<String, Object> extraData) {
             checkNotNull(name);
             checkNotNull(oid);
             checkNotNull(metadataId);
@@ -142,6 +145,7 @@ public abstract class Node implements Bounded, Comparable<Node> {
             this.objectId = oid;
             this.metadataId = metadataId.isNull() ? null : metadataId;
             this.extraData = shadowNullValues(extraData);
+            this.bounds = Float32Bounds.valueOf(bounds);
         }
 
         @Override
@@ -166,13 +170,17 @@ public abstract class Node implements Bounded, Comparable<Node> {
 
         @Override
         public boolean intersects(Envelope env) {
-            // override as needed
-            return false;
+            return bounds.intersects(env);
         }
 
         @Override
         public void expand(Envelope env) {
-            // override as needed
+            bounds.expand(env);
+        }
+
+        @Override
+        public Optional<Envelope> bounds() {
+            return fromNullable(bounds.isNull() ? null : bounds.asEnvelope());
         }
 
         @Override
@@ -225,36 +233,36 @@ public abstract class Node implements Bounded, Comparable<Node> {
     }
 
     public static Node create(final String name, final ObjectId oid, final ObjectId metadataId,
-            final TYPE type, @Nullable final Envelope bounds,
-            @Nullable Map<String, Object> extraData) {
+            final TYPE type, @Nullable Envelope bounds, @Nullable Map<String, Object> extraData) {
         checkNotNull(name, "name");
         checkNotNull(oid, "oid");
         checkNotNull(metadataId, "metadataId");
         checkNotNull(type, "type");
 
+        bounds = bounds == null || bounds.isNull() ? null : bounds;
+
         switch (type) {
         case FEATURE:
-            if (bounds == null || bounds.isNull()) {
-                return new FeatureNode(name, oid, metadataId, extraData);
-            } else {
-                return new BoundedFeatureNode(name, oid, metadataId, bounds, extraData);
-            }
+            return new FeatureNode(name, oid, metadataId, bounds, extraData);
         case TREE:
-            if (bounds == null || bounds.isNull()) {
-                return new TreeNode(name, oid, metadataId, extraData);
-            } else {
-                return new BoundedTreeNode(name, oid, metadataId, bounds, extraData);
-            }
+            return new TreeNode(name, oid, metadataId, bounds, extraData);
         default:
             throw new IllegalArgumentException(
                     "Only FEATURE and TREE nodes can be created, got type " + type);
         }
     }
 
-    private static class TreeNode extends BaseNode {
+    public static @Nullable Envelope makePrecise(@Nullable Envelope bounds) {
+        Envelope float32Bounds = Float32Bounds.valueOf(bounds).asEnvelope();
+        return float32Bounds.isNull() ? null : float32Bounds;
+    }
 
-        public TreeNode(String name, ObjectId oid, ObjectId mdid, Map<String, Object> extraData) {
-            super(name, oid, mdid, extraData);
+    private static final class TreeNode extends BaseNode {
+
+        // dim0(0),dim0(1),dim1(0),dim1(1)
+        public TreeNode(String name, ObjectId oid, ObjectId mdid, @Nullable Envelope env,
+                @Nullable Map<String, Object> extraData) {
+            super(name, oid, mdid, env, extraData);
         }
 
         @Override
@@ -262,69 +270,14 @@ public abstract class Node implements Bounded, Comparable<Node> {
             return TYPE.TREE;
         }
 
-        @Override
-        public Optional<Envelope> bounds() {
-            return Optional.absent();
-        }
     }
 
-    private static final class BoundedTreeNode extends TreeNode {
+    private static final class FeatureNode extends BaseNode {
 
-        // dim0(0),dim0(1),dim1(0),dim1(1)
-        private float[] bounds;
-
-        public BoundedTreeNode(String name, ObjectId oid, ObjectId mdid, Envelope env,
-                Map<String, Object> extraData) {
-            super(name, oid, mdid, extraData);
-
-            if (env.getWidth() == 0 && env.getHeight() == 0) {
-                bounds = new float[2];
-            } else {
-                bounds = new float[4];
-                bounds[2] = (float) env.getMaxX();
-                bounds[3] = (float) env.getMaxY();
-            }
-            bounds[0] = (float) env.getMinX();
-            bounds[1] = (float) env.getMinY();
-        }
-
-        @Override
-        public boolean intersects(Envelope env) {
-            if (env.isNull()) {
-                return false;
-            }
-            if (bounds.length == 2) {
-                return env.intersects(bounds[0], bounds[1]);
-            }
-            return !(env.getMinX() > bounds[2] || env.getMaxX() < bounds[0]
-                    || env.getMinY() > bounds[3] || env.getMaxY() < bounds[1]);
-        }
-
-        @Override
-        public void expand(Envelope env) {
-            env.expandToInclude(bounds[0], bounds[1]);
-            if (bounds.length > 2) {
-                env.expandToInclude(bounds[2], bounds[3]);
-            }
-        }
-
-        @Override
-        public Optional<Envelope> bounds() {
-            Envelope b;
-            if (bounds.length == 2) {
-                b = new Envelope(bounds[0], bounds[0], bounds[1], bounds[1]);
-            } else {
-                b = new Envelope(bounds[0], bounds[2], bounds[1], bounds[3]);
-            }
-            return Optional.of(b);
-        }
-    }
-
-    private static class FeatureNode extends BaseNode {
-
-        public FeatureNode(String name, ObjectId oid, ObjectId mdid,
-                Map<String, Object> extraData) {
-            super(name, oid, mdid, extraData);
+        // dim0(0),dim1(0),dim0(1),dim1(1)
+        public FeatureNode(String name, ObjectId oid, ObjectId mdid, @Nullable Envelope env,
+                @Nullable Map<String, Object> extraData) {
+            super(name, oid, mdid, env, extraData);
         }
 
         @Override
@@ -332,63 +285,6 @@ public abstract class Node implements Bounded, Comparable<Node> {
             return TYPE.FEATURE;
         }
 
-        @Override
-        public Optional<Envelope> bounds() {
-            return Optional.absent();
-        }
-
-    }
-
-    private static final class BoundedFeatureNode extends FeatureNode {
-
-        // dim0(0),dim1(0),dim0(1),dim1(1)
-        private float[] bounds;
-
-        public BoundedFeatureNode(String name, ObjectId oid, ObjectId mdid, Envelope env,
-                Map<String, Object> extraData) {
-            super(name, oid, mdid, extraData);
-
-            if (env.getWidth() == 0 && env.getHeight() == 0) {
-                bounds = new float[2];
-            } else {
-                bounds = new float[4];
-                bounds[2] = (float) env.getMaxX();
-                bounds[3] = (float) env.getMaxY();
-            }
-            bounds[0] = (float) env.getMinX();
-            bounds[1] = (float) env.getMinY();
-        }
-
-        @Override
-        public boolean intersects(Envelope env) {
-            if (env.isNull()) {
-                return false;
-            }
-            if (bounds.length == 2) {
-                return env.intersects(bounds[0], bounds[1]);
-            }
-            return !(env.getMinX() > bounds[2] || env.getMaxX() < bounds[0]
-                    || env.getMinY() > bounds[3] || env.getMaxY() < bounds[1]);
-        }
-
-        @Override
-        public void expand(Envelope env) {
-            env.expandToInclude(bounds[0], bounds[1]);
-            if (bounds.length > 2) {
-                env.expandToInclude(bounds[2], bounds[3]);
-            }
-        }
-
-        @Override
-        public Optional<Envelope> bounds() {
-            Envelope b;
-            if (bounds.length == 2) {
-                b = new Envelope(bounds[0], bounds[0], bounds[1], bounds[1]);
-            } else {
-                b = new Envelope(bounds[0], bounds[2], bounds[1], bounds[3]);
-            }
-            return Optional.of(b);
-        }
     }
 
 }

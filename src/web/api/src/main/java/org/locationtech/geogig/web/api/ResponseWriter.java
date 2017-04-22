@@ -25,7 +25,6 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.geotools.metadata.iso.citation.Citations;
 import org.geotools.referencing.CRS;
 import org.locationtech.geogig.data.FeatureBuilder;
-import org.locationtech.geogig.data.GeogigSimpleFeature;
 import org.locationtech.geogig.model.Bucket;
 import org.locationtech.geogig.model.FieldType;
 import org.locationtech.geogig.model.Node;
@@ -71,6 +70,7 @@ import org.locationtech.geogig.web.api.commands.RemoteManagement;
 import org.locationtech.geogig.web.api.commands.Statistics;
 import org.locationtech.geogig.web.api.commands.Tag;
 import org.locationtech.geogig.web.api.commands.UpdateRef;
+import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.type.GeometryType;
 import org.opengis.feature.type.PropertyDescriptor;
 import org.opengis.feature.type.PropertyType;
@@ -178,7 +178,8 @@ public class ResponseWriter {
      * @param content the element content
      * @throws StreamWriterException
      */
-    public void writeElement(String element, @Nullable String content) throws StreamWriterException {
+    public void writeElement(String element, @Nullable String content)
+            throws StreamWriterException {
         out.writeElement(element, content);
     }
 
@@ -204,7 +205,8 @@ public class ResponseWriter {
      * @param length the number of changes to write
      * @throws StreamWriterException
      */
-    public void writeStaged(DiffIndex setFilter, int start, int length) throws StreamWriterException {
+    public void writeStaged(DiffIndex setFilter, int start, int length)
+            throws StreamWriterException {
         writeDiffEntries("staged", start, length, setFilter.call());
     }
 
@@ -326,7 +328,8 @@ public class ResponseWriter {
     }
 
     private void writeCommit(RevCommit commit, String tag, @Nullable Integer adds,
-            @Nullable Integer modifies, @Nullable Integer removes, boolean isListCommit) throws StreamWriterException {
+            @Nullable Integer modifies, @Nullable Integer removes, boolean isListCommit)
+            throws StreamWriterException {
         if (isListCommit) {
             // in a list, write to an array
             out.writeStartArrayElement(tag);
@@ -406,7 +409,8 @@ public class ResponseWriter {
         out.writeEndElement();
     }
 
-    public void writeFeatureType(RevFeatureType featureType, String tag) throws StreamWriterException {
+    public void writeFeatureType(RevFeatureType featureType, String tag)
+            throws StreamWriterException {
         out.writeStartElement(tag);
         writeElement("id", featureType.getId().toString());
         writeElement("name", featureType.getName().toString());
@@ -481,7 +485,8 @@ public class ResponseWriter {
         writePerson("tagger", revTag.getTagger());
     }
 
-    private void writeTag(RevTag revTag, String tag, boolean isListTag) throws StreamWriterException {
+    private void writeTag(RevTag revTag, String tag, boolean isListTag)
+            throws StreamWriterException {
         if (isListTag) {
             // Tag is in a List
             out.writeStartArrayElement(tag);
@@ -971,7 +976,7 @@ public class ResponseWriter {
 
                             RevFeature revFeature = (RevFeature) feature.get();
                             FeatureBuilder builder = new FeatureBuilder(featureType);
-                            GeogigSimpleFeature simpleFeature = (GeogigSimpleFeature) builder
+                            SimpleFeature simpleFeature = (SimpleFeature) builder
                                     .build(revFeature.getId().toString(), revFeature);
                             change = new GeometryChange(simpleFeature, input.changeType(), path,
                                     crsCode);
@@ -985,7 +990,7 @@ public class ResponseWriter {
         while (changeIterator.hasNext() && (elementsPerPage == 0 || counter < elementsPerPage)) {
             GeometryChange next = changeIterator.next();
             if (next != null) {
-                GeogigSimpleFeature feature = next.getFeature();
+                SimpleFeature feature = next.getFeature();
                 ChangeType change = next.getChangeType();
                 out.writeStartArrayElement("Feature");
                 writeElement("change", change.toString());
@@ -1027,7 +1032,8 @@ public class ResponseWriter {
     }
 
     private void writeConflicts(final Context geogig, Iterator<Conflict> conflicts,
-            final ObjectId ours, final ObjectId theirs, boolean alreadyInArray) throws StreamWriterException {
+            final ObjectId ours, final ObjectId theirs, boolean alreadyInArray)
+            throws StreamWriterException {
         Iterator<GeometryConflict> conflictIterator = Iterators.transform(conflicts,
                 new Function<Conflict, GeometryConflict>() {
                     @Override
@@ -1108,7 +1114,7 @@ public class ResponseWriter {
                             }
 
                             FeatureBuilder builder = new FeatureBuilder(type);
-                            GeogigSimpleFeature simpleFeature = (GeogigSimpleFeature) builder
+                            SimpleFeature simpleFeature = (SimpleFeature) builder
                                     .build(feature.getId().toString(), feature);
                             Geometry geom = null;
                             List<Object> attributes = simpleFeature.getAttributes();
@@ -1161,8 +1167,8 @@ public class ResponseWriter {
         writeMerged(geogig, features, false);
     }
 
-    private void writeMerged(final Context geogig, Iterator<FeatureInfo> features, boolean alreadyInArray)
-            throws StreamWriterException {
+    private void writeMerged(final Context geogig, Iterator<FeatureInfo> features,
+            boolean alreadyInArray) throws StreamWriterException {
         Iterator<GeometryChange> changeIterator = Iterators.transform(features,
                 new Function<FeatureInfo, GeometryChange>() {
 
@@ -1202,7 +1208,7 @@ public class ResponseWriter {
                         }
 
                         FeatureBuilder builder = new FeatureBuilder(featureType);
-                        GeogigSimpleFeature simpleFeature = (GeogigSimpleFeature) builder
+                        SimpleFeature simpleFeature = (SimpleFeature) builder
                                 .build(revFeature.getId().toString(), revFeature);
                         change = new GeometryChange(simpleFeature, ChangeType.MODIFIED,
                                 input.getPath(), crsCode);
@@ -1216,7 +1222,7 @@ public class ResponseWriter {
         while (changeIterator.hasNext()) {
             GeometryChange next = changeIterator.next();
             if (next != null) {
-                GeogigSimpleFeature feature = next.getFeature();
+                SimpleFeature feature = next.getFeature();
                 out.writeStartArrayElement("Feature");
                 writeElement("change", "MERGED");
                 writeElement("id", next.getPath());
@@ -1454,7 +1460,7 @@ public class ResponseWriter {
     }
 
     private class GeometryChange {
-        private GeogigSimpleFeature feature;
+        private SimpleFeature feature;
 
         private ChangeType changeType;
 
@@ -1462,7 +1468,7 @@ public class ResponseWriter {
 
         private String crs;
 
-        public GeometryChange(GeogigSimpleFeature feature, ChangeType changeType, String path,
+        public GeometryChange(SimpleFeature feature, ChangeType changeType, String path,
                 String crs) {
             this.feature = feature;
             this.changeType = changeType;
@@ -1470,7 +1476,7 @@ public class ResponseWriter {
             this.crs = crs;
         }
 
-        public GeogigSimpleFeature getFeature() {
+        public SimpleFeature getFeature() {
             return feature;
         }
 

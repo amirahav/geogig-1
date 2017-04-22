@@ -11,15 +11,17 @@ package org.locationtech.geogig.data.retrieve;
 
 import java.util.Iterator;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.data.FeatureBuilder;
 import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.RevFeature;
+import org.locationtech.geogig.model.RevFeatureType;
 import org.locationtech.geogig.storage.AutoCloseableIterator;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ObjectInfo;
 import org.locationtech.geogig.storage.ObjectStore;
 import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.Name;
 
 import com.google.common.base.Function;
 import com.vividsolutions.jts.geom.GeometryFactory;
@@ -51,9 +53,28 @@ public class BulkFeatureRetriever {
      */
     public AutoCloseableIterator<ObjectInfo<RevFeature>> getGeoGIGFeatures(Iterator<NodeRef> refs) {
         AutoCloseableIterator<ObjectInfo<RevFeature>> objects;
+
+        AutoCloseableIterator<NodeRef> closeableRefs = AutoCloseableIterator.fromIterator(refs);
         objects = odb.getObjects(refs, BulkOpListener.NOOP_LISTENER, RevFeature.class);
 
-        return objects;
+        return new AutoCloseableIterator<ObjectInfo<RevFeature>>() {
+
+            @Override
+            public void close() {
+                objects.close();
+                closeableRefs.close();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return objects.hasNext();
+            }
+
+            @Override
+            public ObjectInfo<RevFeature> next() {
+                return objects.next();
+            }
+        };
     }
 
     /**
@@ -80,16 +101,19 @@ public class BulkFeatureRetriever {
      *
      * This DOES NOT retrieves FeatureType info from the ObjectDatabase.
      *
-     * @param refs
-     * @param schema
+     * @param refs list of node refs to fetch {@link RevFeature}s for
+     * @param nativeType the feature type the features adhere to
+     * @param typeNameOverride in case the resulting feature type needs to be renamed (e.g. to
+     *        change the namespace URI, and/or the local name)
+     * @param geometryFactory the geometry factory to create geometry attributes with
      * @return
      */
     public AutoCloseableIterator<SimpleFeature> getGeoToolsFeatures(
-            AutoCloseableIterator<NodeRef> refs, SimpleFeatureType schema,
-            GeometryFactory geometryFactory) {
+            AutoCloseableIterator<NodeRef> refs, RevFeatureType nativeType,
+            @Nullable Name typeNameOverride, GeometryFactory geometryFactory) {
 
         // builder for this particular schema
-        FeatureBuilder featureBuilder = new FeatureBuilder(schema);
+        FeatureBuilder featureBuilder = new FeatureBuilder(nativeType, typeNameOverride);
 
         // function that converts the FeatureInfo a feature of the given schema
         Function<ObjectInfo<RevFeature>, SimpleFeature> funcBuildFeature = (input -> MultiFeatureTypeBuilder

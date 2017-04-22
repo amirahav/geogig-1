@@ -10,7 +10,11 @@ Details
 
 Project Lead: [Gabriel Roldan](https://github.com/groldan)
 
-Status: A 1.0 version has been released and it is available for download, with a full commandline interface to import data and work with repositories.
+Status: 
+
+A 1.1-beta1 version has been released and it is available for [download](https://github.com/locationtech/geogig/releases/tag/v1.1-beta1).
+
+A 1.0 version has been released and it is available for download, with a full commandline interface to import data and work with repositories.
 
 The build is actively monitored at [LocationTech Build Server](https://hudson.locationtech.org/geogig/).
 
@@ -20,18 +24,19 @@ License
 GeoGig is proudly open source:
 
 * Source code is distributed under an [Eclipse Distribution License (EDL)](LICENSE.txt>) unless otherwise stated.
-  This is a BSD 3 Clause License.
 * For details on third-party dependencies review [NOTICE](NOTICE.txt>)
 
 Download
 --------
 
-No release downloads available yet. The latest release candidate [Version 1.0](https://github.com/locationtech/geogig/releases/) is available on GitHub.
+The latest beta version [Version 1.1-beta1](https://github.com/locationtech/geogig/releases/tag/v1.1-beta1) is available on GitHub.
+
+The latest release [Version 1.0](https://github.com/locationtech/geogig/releases/tag/v1.0) is available on GitHub.
 
 Installation
 ------------
 
-Unzip geogig-1.0.zip to an applications directory, and then add the unzipped geogig/bin/ folder to your PATH.
+Unzip geogig-<version>.zip to an applications directory, and then add the unzipped geogig/bin/ folder to your PATH.
 
 Running
 -------

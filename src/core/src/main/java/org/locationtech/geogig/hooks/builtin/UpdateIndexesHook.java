@@ -7,6 +7,7 @@ import org.locationtech.geogig.hooks.CannotRunGeogigOperationException;
 import org.locationtech.geogig.hooks.CommandHook;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.plumbing.UpdateRef;
+import org.locationtech.geogig.porcelain.ConflictsException;
 import org.locationtech.geogig.porcelain.index.Index;
 import org.locationtech.geogig.porcelain.index.UpdateIndexesOp;
 import org.locationtech.geogig.repository.AbstractGeoGigOp;
@@ -56,9 +57,10 @@ public class UpdateIndexesHook implements CommandHook {
                             .setProgressListener(listener)//
                             .call();
                     if (!updates.isEmpty()) {
-                        System.err.println("***" + updates);
                         listener.setDescription(String.format("updated indexes: %s\n", updates));
                     }
+                } catch (ConflictsException conflictsEx) {
+                    // expected, we don't update indexes if there are merge conflicts
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

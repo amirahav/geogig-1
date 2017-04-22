@@ -9,6 +9,10 @@
  */
 package org.locationtech.geogig.model.internal;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -16,8 +20,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -35,7 +41,6 @@ import org.locationtech.geogig.repository.ProgressListener;
 import org.locationtech.geogig.repository.impl.SpatialOps;
 import org.locationtech.geogig.storage.ObjectStore;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedMap;
@@ -55,8 +60,19 @@ public class DAGTreeBuilder {
     private static final ForkJoinPool FORK_JOIN_POOL;
 
     static {
+        ForkJoinPool.ForkJoinWorkerThreadFactory threadFactoryShared = pool -> {
+            final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory
+                    .newThread(pool);
+            worker.setName("DAGTreeBuilder-shared-" + worker.getPoolIndex());
+            return worker;
+        };
+
         int parallelism = Math.max(2, Runtime.getRuntime().availableProcessors());
-        FORK_JOIN_POOL = new ForkJoinPool(parallelism);
+        UncaughtExceptionHandler eh = (t, e) -> {
+            System.err.println("Uncaught ForkJoinPool exception at thread " + t.getName());
+            e.printStackTrace();
+        };
+        FORK_JOIN_POOL = new ForkJoinPool(parallelism, threadFactoryShared, eh, false);
     }
 
     private static class SharedState {
@@ -138,6 +154,7 @@ public class DAGTreeBuilder {
         SharedState state = new SharedState(targetStore, clusteringStrategy, listener);
 
         final DAG root = clusteringStrategy.buildRoot();
+
         final TreeId rootId = root.getId();
         final int baseDepth = rootId.depthLength();
         TreeBuildTask task = new TreeBuildTask(state, root, baseDepth);
@@ -177,34 +194,37 @@ public class DAGTreeBuilder {
 
             try {
                 final DAG root = this.root;
-                if (root.getState().equals(STATE.CHANGED)) {
+                final STATE rootState = root.getState();
+                if (rootState.equals(STATE.CHANGED)) {
                     if (0 == root.numBuckets()) {
                         result = buildLeafTree(root);
                     } else {
                         result = buildBucketsTree(root);
                     }
                 } else {
-                    ObjectId treeId = root.originalTreeId;
+                    checkState(rootState == STATE.INITIALIZED || rootState == STATE.MIRRORED);
+                    ObjectId treeId = root.originalTreeId();
                     result = state.getTree(treeId);
                 }
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | InterruptedException | ExecutionException e) {
                 state.listener.cancel();// let any other running task abort asap
-                throw e;
+                throw Throwables.propagate(e);
             }
 
             state.addNewTree(result);
             return result;
         }
 
-        private RevTree buildBucketsTree(final DAG root) {
+        private RevTree buildBucketsTree(final DAG root)
+                throws InterruptedException, ExecutionException {
 
             final List<DAG> mutableBuckets;
             {
                 final Set<TreeId> dagBuckets = new HashSet<>();
                 root.forEachBucket((b) -> dagBuckets.add(b));
-                Preconditions.checkNotNull(dagBuckets);
+                checkNotNull(dagBuckets);
                 mutableBuckets = this.state.clusteringStrategy.getDagTrees(dagBuckets);
-                Preconditions.checkState(dagBuckets.size() == mutableBuckets.size());
+                checkState(dagBuckets.size() == mutableBuckets.size());
             }
 
             Map<Integer, ForkJoinTask<RevTree>> subtasks = new HashMap<>();
@@ -214,9 +234,11 @@ public class DAGTreeBuilder {
 
                 final Integer bucketIndex = dagBucketId.bucketIndex(depth);
                 TreeBuildTask subtask = new TreeBuildTask(state, bucketDAG, this.depth + 1);
-                ForkJoinTask<RevTree> fork = subtask.fork();
-                subtasks.put(bucketIndex, fork);
+                subtasks.put(bucketIndex, subtask);
             }
+
+            // forks all subtasks and return when they're all done
+            invokeAll(subtasks.values());
 
             long size = 0;
             int childTreeCount = 0;
@@ -228,7 +250,7 @@ public class DAGTreeBuilder {
 
                 Integer bucketIndex = e.getKey();
                 ForkJoinTask<RevTree> task = e.getValue();
-                RevTree bucketTree = task.join();
+                RevTree bucketTree = task.get();
 
                 if (!bucketTree.isEmpty()) {
 
@@ -252,7 +274,7 @@ public class DAGTreeBuilder {
         }
 
         private RevTree buildLeafTree(DAG root) {
-            Preconditions.checkState(root.numBuckets() == 0);
+            checkState(root.numBuckets() == 0);
 
             final ImmutableList<Node> children;
             {
