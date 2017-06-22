@@ -197,8 +197,8 @@ public class ZipDataStoreExportOp extends DataStoreExportOp<File> {
                         }
                     }
                     fbuilder.set("BikeLane", mergeClasses(ft));
-                    if (feature.getProperty("BikeDir").getValue() == null || feature.getProperty("BikeDir").getValue().equals("")) 
-                    	fbuilder.set("BikeDir", bikeDirection(ft));
+                    if (feature.getProperty("BIKE_TRAFD").getValue() == null || feature.getProperty("BIKE_TRAFD").getValue().equals("")) 
+                    	fbuilder.set("BIKE_TRAFD", bikeDirection(ft));
                     Feature modifiedFeature = fbuilder
                             .buildFeature(feature.getIdentifier().getID());
 
